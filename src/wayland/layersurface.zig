@@ -140,7 +140,5 @@ test "Layer Surface" {
 
     client.roundtrip();
 
-    while (true) {
-        _ = client.display().dispatch();
-    }
+    _ = client.display().dispatch();
 }
