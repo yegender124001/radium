@@ -14,6 +14,7 @@ const LayerSurfaceData = struct {
 };
 
 fn createSharedMemory(s: usize) i32 {
+    // TODO: Update it to the appId
     const fd = std.posix.memfd_create("radium-shm-buffer", 0) catch return 0;
     _ = std.os.linux.ftruncate(fd, @intCast(s));
 
@@ -25,9 +26,6 @@ fn layerShellListener(layerSrfc: *zwlr.LayerSurfaceV1, event: zwlr.LayerSurfaceV
         .configure => |e| {
             zwlr.LayerSurfaceV1.ackConfigure(layerSrfc, e.serial);
             if ((e.width == 0) or (e.height == 0)) return;
-
-            std.debug.print("Width: {}, Height: {}\n", .{ e.width, e.height });
-
             const shm = data.client.shm() catch return;
 
             const size = e.width * e.height * 4;
@@ -48,7 +46,7 @@ fn layerShellListener(layerSrfc: *zwlr.LayerSurfaceV1, event: zwlr.LayerSurfaceV
                 pixl[i + 0] = 0x22; // Blue
                 pixl[i + 1] = 0x22; // Green
                 pixl[i + 2] = 0x22; // Red
-                pixl[i + 3] = 0xFF; // Alpha (Opaque)
+                pixl[i + 3] = 0xff; // Alpha (Opaque)
             }
 
             data.wlShmPool = shm.createPool(fd, @intCast(size)) catch return;
@@ -75,6 +73,7 @@ pub const LayerSurface = struct {
         const srfc = try comp.createSurface();
 
         const layerShell = try client.layerShell();
+        // TODO: Update it to appId
         const layerSrfc = try layerShell.getLayerSurface(srfc, null, zwlr.LayerShellV1.Layer.bottom, "radium");
 
         const data = try allocator.create(LayerSurfaceData);
@@ -138,7 +137,6 @@ test "Layer Surface" {
     layerSurface.layerSurface().setExclusiveZone(50);
     defer layerSurface.deinit();
 
-    client.roundtrip();
-
+    _ = client.display().roundtrip();
     _ = client.display().dispatch();
 }

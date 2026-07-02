@@ -4,7 +4,7 @@ const xdg = @import("wayland").client.xdg;
 const zxdg = @import("wayland").client.zxdg;
 const mem = @import("std").mem;
 const testing = @import("std").testing;
-
+const std = @import("std");
 const ClientStateData = struct {
     allocator: mem.Allocator,
     display: *wl.Display,
@@ -18,17 +18,17 @@ const ClientStateData = struct {
 
 fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, data: *ClientStateData) void {
     switch (event) {
-        .global => |global| {
-            if (mem.orderZ(u8, global.interface, wl.Compositor.interface.name) == .eq) {
-                data.compositor = registry.bind(global.name, wl.Compositor, 1) catch return;
-            } else if (mem.orderZ(u8, global.interface, wl.Shm.interface.name) == .eq) {
-                data.shm = registry.bind(global.name, wl.Shm, 1) catch return;
-            } else if (mem.orderZ(u8, global.interface, xdg.WmBase.interface.name) == .eq) {
-                data.xdgWmBase = registry.bind(global.name, xdg.WmBase, 1) catch return;
-            } else if (mem.orderZ(u8, global.interface, zwlr.LayerShellV1.interface.name) == .eq) {
-                data.layerShell = registry.bind(global.name, zwlr.LayerShellV1, 4) catch return;
-            } else if (mem.orderZ(u8, global.interface, zxdg.DecorationManagerV1.interface.name) == .eq) {
-                data.xdgDecoration = registry.bind(global.name, zxdg.DecorationManagerV1, 1) catch return;
+        .global => |e| {
+            if (mem.orderZ(u8, e.interface, wl.Compositor.interface.name) == .eq) {
+                data.compositor = registry.bind(e.name, wl.Compositor, 1) catch return;
+            } else if (mem.orderZ(u8, e.interface, wl.Shm.interface.name) == .eq) {
+                data.shm = registry.bind(e.name, wl.Shm, 1) catch return;
+            } else if (mem.orderZ(u8, e.interface, xdg.WmBase.interface.name) == .eq) {
+                data.xdgWmBase = registry.bind(e.name, xdg.WmBase, 1) catch return;
+            } else if (mem.orderZ(u8, e.interface, zwlr.LayerShellV1.interface.name) == .eq) {
+                data.layerShell = registry.bind(e.name, zwlr.LayerShellV1, 4) catch return;
+            } else if (mem.orderZ(u8, e.interface, zxdg.DecorationManagerV1.interface.name) == .eq) {
+                data.xdgDecoration = registry.bind(e.name, zxdg.DecorationManagerV1, 1) catch return;
             }
         },
         .global_remove => {},
@@ -125,11 +125,6 @@ pub const ClientState = struct {
         } else {
             return err.NoXDGDecoration;
         }
-    }
-
-    pub fn roundtrip(self: Self) void {
-        const data: *ClientStateData = @ptrCast(@alignCast(self.data));
-        _ = data.display.roundtrip();
     }
 };
 
