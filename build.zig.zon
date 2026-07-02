@@ -7,6 +7,6 @@
             .hash = "wayland-0.7.0-dev-lQa1kjT8AQDBstL61Gy3WCMtGwVaMN1p6w5wGfdDvP15",
         },
     },
-    .paths = .{""},
+    .paths = .{ "build.zig", "build.zig.zon", "src/radium.zig" },
     .fingerprint = 0xc1735339123db893,
 }
