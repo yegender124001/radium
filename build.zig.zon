@@ -1,0 +1,12 @@
+.{
+    .name = .radium,
+    .version = "0.16.0",
+    .dependencies = .{
+        .wayland = .{
+            .url = "git+https://github.com/ifreund/zig-wayland.git#a8e10e87e5ebb49ce518ac3d2198909c87ee615a",
+            .hash = "wayland-0.7.0-dev-lQa1kjT8AQDBstL61Gy3WCMtGwVaMN1p6w5wGfdDvP15",
+        },
+    },
+    .paths = .{""},
+    .fingerprint = 0xc1735339123db893,
+}
