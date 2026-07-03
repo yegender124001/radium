@@ -4,9 +4,11 @@ const ClientState = @import("clientstate.zig").ClientState;
 const std = @import("std");
 const PaintDevice = @import("../paintdevice.zig");
 const Color = @import("../color.zig").Color;
+const Surface = @import("surface.zig");
+
 const LayerSurfaceData = struct {
     wlShmPool: ?*wl.ShmPool = null,
-    wlSurface: *wl.Surface,
+    surface: *Surface.Surface,
     layerSurface: *zwlr.LayerSurfaceV1,
     allocator: std.mem.Allocator,
     width: u32 = 0,
@@ -64,9 +66,11 @@ fn layerShellListener(layerSrfc: *zwlr.LayerSurfaceV1, event: zwlr.LayerSurfaceV
             data.height = e.height;
             data.wlShmPool.?.destroy();
 
-            data.wlSurface.attach(buffer, 0, 0);
-            data.wlSurface.damage(0, 0, @intCast(e.width), @intCast(e.width));
-            data.wlSurface.commit();
+            data.surface.wlSurface.?.attach(buffer, 0, 0);
+            data.surface.wlSurface.?.damageBuffer(0, 0, @intCast(e.width), @intCast(e.height));
+
+            data.surface.wlSurface.?.commit();
+            buffer.destroy();
         },
         .closed => {},
     }
@@ -78,8 +82,8 @@ pub const LayerSurface = struct {
     const Self = @This();
 
     pub fn init(allocator: std.mem.Allocator, client: ClientState) !Self {
-        const comp = try client.compositor();
-        const srfc = try comp.createSurface();
+        const s = try Surface.Surface.init(client, allocator);
+        const srfc = s.wlSurface.?;
 
         const layerShell = try client.layerShell();
         // TODO: Update it to appId
@@ -96,7 +100,7 @@ pub const LayerSurface = struct {
         data.* = .{
             .client = client,
             .allocator = allocator,
-            .wlSurface = srfc,
+            .surface = s,
             .layerSurface = layerSrfc,
         };
 
@@ -106,15 +110,14 @@ pub const LayerSurface = struct {
     pub fn deinit(self: Self) void {
         const data: *LayerSurfaceData = @ptrCast(@alignCast(self.data));
         zwlr.LayerSurfaceV1.destroy(data.layerSurface);
-        wl.Surface.destroy(data.wlSurface);
-
+        data.surface.deinit();
         const allocator = data.allocator;
         allocator.destroy(data);
     }
 
     pub fn wlSurface(self: Self) *wl.Surface {
         const data: *LayerSurfaceData = @ptrCast(@alignCast(self.data));
-        return data.wlSurface;
+        return data.surface.wlSurface.?;
     }
 
     pub fn layerSurface(self: Self) *zwlr.LayerSurfaceV1 {

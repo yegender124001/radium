@@ -20,11 +20,11 @@ fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, data: *Cli
     switch (event) {
         .global => |e| {
             if (mem.orderZ(u8, e.interface, wl.Compositor.interface.name) == .eq) {
-                data.compositor = registry.bind(e.name, wl.Compositor, 1) catch return;
+                data.compositor = registry.bind(e.name, wl.Compositor, 6) catch return;
             } else if (mem.orderZ(u8, e.interface, wl.Shm.interface.name) == .eq) {
-                data.shm = registry.bind(e.name, wl.Shm, 1) catch return;
+                data.shm = registry.bind(e.name, wl.Shm, 2) catch return;
             } else if (mem.orderZ(u8, e.interface, xdg.WmBase.interface.name) == .eq) {
-                data.xdgWmBase = registry.bind(e.name, xdg.WmBase, 1) catch return;
+                data.xdgWmBase = registry.bind(e.name, xdg.WmBase, 5) catch return;
             } else if (mem.orderZ(u8, e.interface, zwlr.LayerShellV1.interface.name) == .eq) {
                 data.layerShell = registry.bind(e.name, zwlr.LayerShellV1, 4) catch return;
             } else if (mem.orderZ(u8, e.interface, zxdg.DecorationManagerV1.interface.name) == .eq) {

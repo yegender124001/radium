@@ -1,0 +1,76 @@
+const wl = @import("wayland").client.wl;
+const client = @import("clientstate.zig").ClientState;
+const std = @import("std");
+
+fn surfaceListener(srfc: *wl.Surface, event: wl.Surface.Event, data: *Surface) void {
+    _ = srfc;
+    switch (event) {
+        .preferred_buffer_scale => |e| {
+            data.preferredScale = e.factor;
+        },
+        .preferred_buffer_transform => |e| {
+            data.preferredTransform = e.transform;
+        },
+        .enter => {},
+        .leave => {},
+    }
+}
+
+fn frameListener(cb: *wl.Callback, event: wl.Callback.Event, data: *Surface) void {
+    switch (event) {
+        .done => {
+            cb.destroy();
+
+            // Draw here
+            std.debug.print("Draw!", .{});
+            data.frame = data.wlSurface.?.frame() catch return;
+            data.frame.?.setListener(*Surface, frameListener, data);
+        },
+    }
+}
+
+pub const Buffer = struct {
+    wlBuffer: ?*wl.Buffer,
+    released: bool = true,
+    size: u32 = 0,
+    scale: u32 = 0,
+    pixl: [*]u8,
+};
+
+pub const Surface = struct {
+    wlSurface: ?*wl.Surface,
+    preferredScale: i32 = 0,
+    preferredTransform: ?wl.Output.Transform = .normal,
+    frame: ?*wl.Callback = null,
+    buffers: [2]?Buffer = .{ null, null },
+    allocator: std.mem.Allocator,
+
+    const Self = @This();
+
+    pub fn init(c: client, allocator: std.mem.Allocator) !*Self {
+        const comp = try c.compositor();
+        const srfc = try wl.Compositor.createSurface(comp);
+
+        const frame = try srfc.frame();
+        const s = try allocator.create(Surface);
+        errdefer allocator.destroy(s);
+
+        s.* = Surface{
+            .wlSurface = srfc,
+            .frame = frame,
+            .allocator = allocator,
+        };
+
+        frame.setListener(*Surface, frameListener, s);
+
+        srfc.setListener(*Surface, surfaceListener, s);
+        return s;
+    }
+
+    pub fn deinit(self: *Self) void {
+        self.frame.?.destroy();
+        self.wlSurface.?.destroy();
+        const alloc = self.allocator;
+        alloc.destroy(self);
+    }
+};
