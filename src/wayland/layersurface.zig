@@ -2,7 +2,8 @@ const wl = @import("wayland").client.wl;
 const zwlr = @import("wayland").client.zwlr;
 const ClientState = @import("clientstate.zig").ClientState;
 const std = @import("std");
-
+const PaintDevice = @import("../paintdevice.zig");
+const Color = @import("../color.zig").Color;
 const LayerSurfaceData = struct {
     wlShmPool: ?*wl.ShmPool = null,
     wlSurface: *wl.Surface,
@@ -11,6 +12,7 @@ const LayerSurfaceData = struct {
     width: u32 = 0,
     height: u32 = 0,
     client: ClientState,
+    paintDevice: ?PaintDevice.PaintDevice = null,
 };
 
 fn createSharedMemory(s: usize) i32 {
@@ -41,14 +43,21 @@ fn layerShellListener(layerSrfc: *zwlr.LayerSurfaceV1, event: zwlr.LayerSurfaceV
 
             defer _ = std.os.linux.munmap(pixl, size);
 
-            var i: usize = 0;
-            while (i < size) : (i += 4) {
-                pixl[i + 0] = 0x22; // Blue
-                pixl[i + 1] = 0x22; // Green
-                pixl[i + 2] = 0x22; // Red
-                pixl[i + 3] = 0xff; // Alpha (Opaque)
-            }
+            const pd: PaintDevice.PaintDevice = .{
+                .pixl = pixl,
+                .width = e.width,
+                .height = e.height,
+                .stride = e.width * 4,
+            };
 
+            data.paintDevice = pd;
+            const grey = Color.fromHexColor("#222222") catch return;
+            const painter: PaintDevice.Painter = .{
+                .backgroundColor = grey,
+                .paintDevice = pd,
+            };
+
+            painter.clear();
             data.wlShmPool = shm.createPool(fd, @intCast(size)) catch return;
             const buffer = data.wlShmPool.?.createBuffer(0, @intCast(e.width), @intCast(e.height), @intCast(e.width * 4), wl.Shm.Format.argb8888) catch return;
             data.width = e.width;
@@ -138,5 +147,6 @@ test "Layer Surface" {
     defer layerSurface.deinit();
 
     _ = client.display().roundtrip();
+    //    while (true)
     _ = client.display().dispatch();
 }
