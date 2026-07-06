@@ -6,17 +6,6 @@ const PaintDevice = @import("../paintdevice.zig");
 const Color = @import("../color.zig").Color;
 const Surface = @import("surface.zig");
 
-const LayerSurfaceData = struct {
-    wlShmPool: ?*wl.ShmPool = null,
-    surface: *Surface.Surface,
-    layerSurface: *zwlr.LayerSurfaceV1,
-    allocator: std.mem.Allocator,
-    width: u32 = 0,
-    height: u32 = 0,
-    client: ClientState,
-    paintDevice: ?PaintDevice.PaintDevice = null,
-};
-
 fn createSharedMemory(s: usize) i32 {
     // TODO: Update it to the appId
     const fd = std.posix.memfd_create("radium-shm-buffer", 0) catch return 0;
@@ -25,12 +14,12 @@ fn createSharedMemory(s: usize) i32 {
     return fd;
 }
 
-fn layerShellListener(layerSrfc: *zwlr.LayerSurfaceV1, event: zwlr.LayerSurfaceV1.Event, data: *LayerSurfaceData) void {
+fn layerShellListener(layerSrfc: *zwlr.LayerSurfaceV1, event: zwlr.LayerSurfaceV1.Event, data: *LayerSurface) void {
     switch (event) {
         .configure => |e| {
             zwlr.LayerSurfaceV1.ackConfigure(layerSrfc, e.serial);
             if ((e.width == 0) or (e.height == 0)) return;
-            const shm = data.client.shm() catch return;
+            const shm = data.client.shm.?;
 
             const size = e.width * e.height * 4;
             const fd = createSharedMemory(size);
@@ -53,7 +42,7 @@ fn layerShellListener(layerSrfc: *zwlr.LayerSurfaceV1, event: zwlr.LayerSurfaceV
             };
 
             data.paintDevice = pd;
-            const grey = Color.fromHexColor("#222222") catch return;
+            const grey = Color.fromHexColor("#00ff00") catch return;
             const painter: PaintDevice.Painter = .{
                 .backgroundColor = grey,
                 .paintDevice = pd,
@@ -77,22 +66,29 @@ fn layerShellListener(layerSrfc: *zwlr.LayerSurfaceV1, event: zwlr.LayerSurfaceV
 }
 
 pub const LayerSurface = struct {
-    data: *opaque {},
+    wlShmPool: ?*wl.ShmPool = null,
+    surface: *Surface.Surface,
+    layerSurface: *zwlr.LayerSurfaceV1,
+    allocator: std.mem.Allocator,
+    width: u32 = 0,
+    height: u32 = 0,
+    client: *ClientState,
+    paintDevice: ?PaintDevice.PaintDevice = null,
 
     const Self = @This();
 
-    pub fn init(allocator: std.mem.Allocator, client: ClientState) !Self {
+    pub fn init(allocator: std.mem.Allocator, client: *ClientState) !*Self {
         const s = try Surface.Surface.init(client, allocator);
         const srfc = s.wlSurface.?;
 
-        const layerShell = try client.layerShell();
+        const layerShell = client.layerShell.?;
         // TODO: Update it to appId
         const layerSrfc = try layerShell.getLayerSurface(srfc, null, zwlr.LayerShellV1.Layer.bottom, "radium");
 
-        const data = try allocator.create(LayerSurfaceData);
+        const data = try allocator.create(LayerSurface);
         errdefer allocator.destroy(data);
 
-        layerSrfc.setListener(*LayerSurfaceData, layerShellListener, data);
+        layerSrfc.setListener(*LayerSurface, layerShellListener, data);
 
         layerSrfc.setSize(0, 0);
 
@@ -104,35 +100,14 @@ pub const LayerSurface = struct {
             .layerSurface = layerSrfc,
         };
 
-        return .{ .data = @ptrCast(data) };
+        return data;
     }
 
-    pub fn deinit(self: Self) void {
-        const data: *LayerSurfaceData = @ptrCast(@alignCast(self.data));
-        zwlr.LayerSurfaceV1.destroy(data.layerSurface);
-        data.surface.deinit();
-        const allocator = data.allocator;
-        allocator.destroy(data);
-    }
-
-    pub fn wlSurface(self: Self) *wl.Surface {
-        const data: *LayerSurfaceData = @ptrCast(@alignCast(self.data));
-        return data.surface.wlSurface.?;
-    }
-
-    pub fn layerSurface(self: Self) *zwlr.LayerSurfaceV1 {
-        const data: *LayerSurfaceData = @ptrCast(@alignCast(self.data));
-        return data.layerSurface;
-    }
-
-    pub fn width(self: Self) u32 {
-        const data: *LayerSurfaceData = @ptrCast(@alignCast(self.data));
-        return data.width;
-    }
-
-    pub fn height(self: Self) u32 {
-        const data: *LayerSurfaceData = @ptrCast(@alignCast(self.data));
-        return data.height;
+    pub fn deinit(self: *Self) void {
+        zwlr.LayerSurfaceV1.destroy(self.layerSurface);
+        self.surface.deinit();
+        const allocator = self.allocator;
+        allocator.destroy(self);
     }
 };
 
@@ -142,14 +117,14 @@ test "Layer Surface" {
 
     const layerSurface = try LayerSurface.init(std.testing.allocator, client);
 
-    layerSurface.layerSurface().setLayer(.top);
-    layerSurface.layerSurface().setAnchor(.{ .bottom = true, .right = true, .left = true });
-    layerSurface.layerSurface().setSize(0, 50);
-    layerSurface.layerSurface().setMargin(0, 10, 10, 10);
-    layerSurface.layerSurface().setExclusiveZone(50);
+    layerSurface.layerSurface.setLayer(.top);
+    layerSurface.layerSurface.setAnchor(.{ .bottom = true, .right = true, .left = true });
+    layerSurface.layerSurface.setSize(0, 50);
+    layerSurface.layerSurface.setMargin(0, 10, 10, 10);
+    layerSurface.layerSurface.setExclusiveZone(50);
     defer layerSurface.deinit();
 
-    _ = client.display().roundtrip();
-    //    while (true)
-    _ = client.display().dispatch();
+    _ = client.display.roundtrip();
+    //while (true)
+    _ = client.display.dispatch();
 }

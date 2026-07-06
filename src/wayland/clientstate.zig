@@ -5,18 +5,8 @@ const zxdg = @import("wayland").client.zxdg;
 const mem = @import("std").mem;
 const testing = @import("std").testing;
 const std = @import("std");
-const ClientStateData = struct {
-    allocator: mem.Allocator,
-    display: *wl.Display,
-    registry: *wl.Registry,
-    compositor: ?*wl.Compositor = null,
-    shm: ?*wl.Shm = null,
-    layerShell: ?*zwlr.LayerShellV1 = null,
-    xdgWmBase: ?*xdg.WmBase = null,
-    xdgDecoration: ?*zxdg.DecorationManagerV1 = null,
-};
 
-fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, data: *ClientStateData) void {
+fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, data: *ClientState) void {
     switch (event) {
         .global => |e| {
             if (mem.orderZ(u8, e.interface, wl.Compositor.interface.name) == .eq) {
@@ -35,8 +25,26 @@ fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, data: *Cli
     }
 }
 
+fn shmListener(shm: *wl.Shm, event: wl.Shm.Event, data: *ClientState) void {
+    _ = shm;
+    switch (event) {
+        .format => |e| {
+            if (e.format == .argb8888) data.format = e.format;
+            // Support for other formats
+        },
+    }
+}
+
 pub const ClientState = struct {
-    data: *opaque {},
+    allocator: mem.Allocator,
+    display: *wl.Display,
+    registry: *wl.Registry,
+    compositor: ?*wl.Compositor = null,
+    shm: ?*wl.Shm = null,
+    layerShell: ?*zwlr.LayerShellV1 = null,
+    xdgWmBase: ?*xdg.WmBase = null,
+    xdgDecoration: ?*zxdg.DecorationManagerV1 = null,
+    format: wl.Shm.Format = .argb8888,
     const Self = @This();
 
     pub const err = error{
@@ -47,88 +55,39 @@ pub const ClientState = struct {
         NoLayerShell,
     };
 
-    pub fn init(allocator: mem.Allocator) !Self {
+    pub fn init(allocator: mem.Allocator) !*Self {
         const disp = try wl.Display.connect(null);
         const reg = try wl.Display.getRegistry(disp);
 
-        const dat = try allocator.create(ClientStateData);
+        const dat = try allocator.create(Self);
         errdefer allocator.destroy(dat);
-        dat.* = ClientStateData{
+        dat.* = ClientState{
             .allocator = allocator,
             .display = disp,
             .registry = reg,
         };
 
-        reg.setListener(*ClientStateData, registryListener, dat);
+        reg.setListener(*ClientState, registryListener, dat);
         _ = disp.roundtrip();
-        return .{ .data = @ptrCast(dat) };
+
+        dat.shm.?.setListener(*ClientState, shmListener, dat);
+        return dat;
     }
 
-    pub fn deinit(self: Self) void {
-        const data: *ClientStateData = @ptrCast(@alignCast(self.data));
-        if (data.layerShell) |global| zwlr.LayerShellV1.destroy(global);
-        if (data.xdgDecoration) |global| zxdg.DecorationManagerV1.destroy(global);
-        if (data.shm) |global| wl.Shm.destroy(global);
-        if (data.compositor) |global| wl.Compositor.destroy(global);
-        wl.Registry.destroy(data.registry);
-        wl.Display.disconnect(data.display);
+    pub fn deinit(self: *Self) void {
+        if (self.layerShell) |global| zwlr.LayerShellV1.destroy(global);
+        if (self.xdgDecoration) |global| zxdg.DecorationManagerV1.destroy(global);
+        if (self.shm) |global| wl.Shm.destroy(global);
+        if (self.compositor) |global| wl.Compositor.destroy(global);
+        wl.Registry.destroy(self.registry);
+        wl.Display.disconnect(self.display);
 
-        const allocator = data.allocator;
-        allocator.destroy(data);
-    }
-
-    pub fn display(self: Self) *wl.Display {
-        const data: *ClientStateData = @ptrCast(@alignCast(self.data));
-        return data.display;
-    }
-
-    pub fn compositor(self: Self) err!*wl.Compositor {
-        const data: *ClientStateData = @ptrCast(@alignCast(self.data));
-        if (data.compositor) |comp| {
-            return comp;
-        } else {
-            return err.NoCompositor;
-        }
-    }
-
-    pub fn shm(self: Self) err!*wl.Shm {
-        const data: *ClientStateData = @ptrCast(@alignCast(self.data));
-        if (data.shm) |sh| {
-            return sh;
-        } else {
-            return err.NoSHM;
-        }
-    }
-
-    pub fn layerShell(self: Self) err!*zwlr.LayerShellV1 {
-        const data: *ClientStateData = @ptrCast(@alignCast(self.data));
-        if (data.layerShell) |ls| {
-            return ls;
-        } else {
-            return err.NoLayerShell;
-        }
-    }
-
-    pub fn xdgWmBase(self: Self) ?*xdg.WmBase {
-        const data: *ClientStateData = @ptrCast(@alignCast(self.data));
-        if (data.xdgWmBase) |wm| {
-            return wm;
-        } else {
-            return err.NoXDGWMBase;
-        }
-    }
-
-    pub fn xdgDecoration(self: Self) ?*zxdg.DecorationManagerV1 {
-        const data: *ClientStateData = @ptrCast(@alignCast(self.data));
-        if (data.xdgDecoration) |decor| {
-            return decor;
-        } else {
-            return err.NoXDGDecoration;
-        }
+        const allocator = self.allocator;
+        allocator.destroy(self);
     }
 };
 
 test "Platform" {
-    const state: ClientState = try .init(testing.allocator);
+    const state: *ClientState = try .init(testing.allocator);
     defer state.deinit();
 }
