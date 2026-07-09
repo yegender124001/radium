@@ -1,4 +1,4 @@
-const platform = @import("wayland/platform.zig");
+pub const platform = @import("wayland/platform.zig");
 
 pub const Color = @import("color.zig").Color;
 

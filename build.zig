@@ -38,4 +38,23 @@ pub fn build(b: *std.Build) !void {
     const run_radium_test = b.addRunArtifact(radium_test);
     const radium_test_step = b.step("test", "Run tests");
     radium_test_step.dependOn(&run_radium_test.step);
+
+    const gallery_mod = b.addModule("gallery", .{
+        .root_source_file = b.path("gallery/main.zig"),
+        .optimize = optimize,
+        .target = target,
+    });
+
+    gallery_mod.addImport("radium", radium_mod);
+
+    const gallery_exe = b.addExecutable(.{
+        .name = "gallery",
+        .root_module = gallery_mod,
+    });
+
+    b.installArtifact(gallery_exe);
+
+    const run_gallery = b.addRunArtifact(gallery_exe);
+    const run_gallery_step = b.step("gallery", "Run widget gallery");
+    run_gallery_step.dependOn(&run_gallery.step);
 }

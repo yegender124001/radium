@@ -3,6 +3,8 @@ const client = @import("clientstate.zig").ClientState;
 const std = @import("std");
 const PaintDevice = @import("../paintdevice.zig");
 
+const bufferCount = 2;
+
 // Buffer Listener. The thing it's supposed to do
 // is to mark that the buffer is released and can
 // be reused.
@@ -38,12 +40,16 @@ fn surfaceListener(srfc: *wl.Surface, event: wl.Surface.Event, data: *Surface) v
 fn frameListener(cb: *wl.Callback, event: wl.Callback.Event, data: *Surface) void {
     switch (event) {
         .done => {
-            cb.destroy();
-
+            std.debug.print("done event", .{});
             // Draw Here,
+            data.wlSurface.?.attach(data.buffers.items[0].wlBuffer.?, 0, 0);
+            data.wlSurface.?.damage(0, 0, @intCast(data.width), @intCast(data.height));
+            data.wlSurface.?.commit();
 
             data.frame = data.wlSurface.?.frame() catch return;
             data.frame.?.setListener(*Surface, frameListener, data);
+
+            cb.destroy();
         },
     }
 }
@@ -63,12 +69,12 @@ pub const Surface = struct {
     allocator: std.mem.Allocator,
     shmPool: ?*wl.ShmPool = null,
     client: *client,
-    width: i32 = 0,
-    height: i32 = 0,
-    stride: i32 = 0,
+    width: u32 = 0,
+    height: u32 = 0,
+    stride: u32 = 0,
     fd: i32 = 0,
     pixl: ?[*]u8 = null,
-    buffers: ?[2]Buffer = null,
+    buffers: std.ArrayList(Buffer),
 
     const Self = @This();
 
@@ -80,25 +86,35 @@ pub const Surface = struct {
         const s = try allocator.create(Surface);
         errdefer allocator.destroy(s);
 
+        const buff = try std.ArrayList(Buffer).initCapacity(allocator, bufferCount);
+
+        errdefer s.buffers.deinit(allocator);
+
         s.* = Surface{
             .wlSurface = srfc,
             .frame = frame,
             .allocator = allocator,
             .client = c,
+            .buffers = buff,
         };
+
+        inline for (0..bufferCount) |i| {
+            _ = i;
+            try s.buffers.append(allocator, .{});
+        }
 
         frame.setListener(*Surface, frameListener, s);
 
         srfc.setListener(*Surface, surfaceListener, s);
+
         return s;
     }
 
     pub fn deinit(self: *Self) void {
-        if (self.buffers) |bufs| {
-            for (&bufs) |*buf| {
-                buf.wlBuffer.?.destroy();
-            }
+        inline for (0..bufferCount) |i| {
+            self.buffers.items[i].wlBuffer.?.destroy();
         }
+        self.buffers.deinit(self.allocator);
         if (self.frame) |fr| fr.destroy();
         if (self.shmPool) |spool| spool.destroy();
         if (self.wlSurface) |srfc| srfc.destroy();
@@ -106,27 +122,14 @@ pub const Surface = struct {
         alloc.destroy(self);
     }
 
-    pub fn setupBuffers(self: *Self) !void {
-        for (&self.buffers.?, 0..) |*buf, i| {
-            // Calculate the byte offset within the shared memory pool
-            const frame_size = self.stride * self.height;
-            const offset: i32 = @intCast(i * frame_size);
-
-            buf.wlBuffer = try self.shmPool.?.createBuffer(offset, self.width, self.height, self.stride, self.client.supportedFormat());
-            buf.released = true;
-
-            buf.wlBuffer.?.setListener(*Buffer, bufferListener, buf);
-        }
-    }
-
-    pub fn setupShmPool(self: *Self) !void {
+    pub fn setupSurface(self: *Self) !void {
         if ((self.width == 0) or (self.height == 0)) {
             return error.IncorrectWidthOrHeight;
         }
 
         const shm = self.client.shm.?;
 
-        const size = self.height * self.stride;
+        const size = self.height * self.stride * bufferCount;
 
         const fd = try std.posix.memfd_create("radium-shm-buffer", 0);
         _ = std.os.linux.ftruncate(fd, @intCast(size));
@@ -138,8 +141,27 @@ pub const Surface = struct {
 
         // TODO: Setup for double buffers
         const pixl: [*]u8 = @ptrFromInt(map_addr);
+
+        //        const total_bytes = self.height * self.stride;
+        var image_bytes = pixl[0..size];
+
+        var x: usize = 0;
+        while (x < size) : (x += 4) {
+            image_bytes[x + 0] = 0; // Blue
+            image_bytes[x + 1] = 255; // Green
+            image_bytes[x + 2] = 0; // Red
+            image_bytes[x + 3] = 255; // Alpha (Opaque)
+        }
         self.pixl = pixl;
 
         self.shmPool = try shm.createPool(fd, @intCast(size));
+
+        for (self.buffers.items, 0..bufferCount) |*buf, i| {
+            if (buf.released) {
+                buf.wlBuffer = try self.shmPool.?.createBuffer(@intCast(i * self.width * self.height), @intCast(self.width), @intCast(self.height), @intCast(self.stride), self.client.format);
+
+                buf.wlBuffer.?.setListener(*Buffer, bufferListener, buf);
+            }
+        }
     }
 };
