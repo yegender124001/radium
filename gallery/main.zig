@@ -2,13 +2,12 @@ const radium = @import("radium");
 
 const std = @import("std");
 
-// Copy of the Layer Surface Test
-pub fn main(io: std.process.Init) !void {
-    const allocator = io.gpa;
+pub fn main(init: std.process.Init) !void {
+    const gpa = init.gpa;
 
-    var backend = try radium.platform.init(allocator);
-    defer backend.deinit();
+    const app = try radium.App.init(gpa);
+    defer app.deinit();
 
-    const surface = try backend.createSurface(.{ .layer = .{} });
-    _ = surface;
+    const window = try radium.Window.init(gpa);
+    defer window.deinit();
 }
