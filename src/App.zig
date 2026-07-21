@@ -4,9 +4,12 @@
 const Self = @This();
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const Platform = @import("Platform.zig");
+
+const wayland = @import("Wayland/platform.zig");
 
 allocator: Allocator,
-marks: u8 = 0,
+platform: Platform,
 
 var instance: ?*Self = null;
 
@@ -18,8 +21,12 @@ pub fn init(allocator: Allocator) !*Self {
     const ptr = try allocator.create(Self);
     errdefer allocator.destroy(ptr);
 
+    const platform = try wayland.init(allocator);
+    errdefer platform.deinit();
+
     ptr.* = .{
         .allocator = allocator,
+        .platform = platform,
     };
 
     instance = ptr;
@@ -37,9 +44,11 @@ pub fn getInstance() !*Self {
 pub fn deinit(self: *Self) void {
     if (instance == null) return;
 
+    // DO EVERYTHING BELOW HERE!
+    self.platform.deinit();
     const allocator = self.allocator;
-
     allocator.destroy(self);
+    // AND ABOVE FROM THIS LINE.
 
     instance = null;
 }

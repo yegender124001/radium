@@ -11,6 +11,8 @@ pub fn build(b: *std.Build) !void {
 
     const wayland = b.createModule(.{ .root_source_file = scanner.result });
 
+    const use_llvm = b.option(bool, "llvm", "Use LLVM");
+
     scanner.addSystemProtocol("stable/xdg-shell/xdg-shell.xml");
     scanner.addSystemProtocol("unstable/xdg-decoration/xdg-decoration-unstable-v1.xml");
     scanner.addCustomProtocol(b.path("protocols/wlr-layer-shell-unstable-v1.xml"));
@@ -34,6 +36,8 @@ pub fn build(b: *std.Build) !void {
 
     const radium_test = b.addTest(.{
         .root_module = radium_mod,
+        .use_llvm = use_llvm,
+        .use_lld = use_llvm,
     });
     const run_radium_test = b.addRunArtifact(radium_test);
     const radium_test_step = b.step("test", "Run tests");
@@ -50,6 +54,8 @@ pub fn build(b: *std.Build) !void {
     const gallery_exe = b.addExecutable(.{
         .name = "gallery",
         .root_module = gallery_mod,
+        .use_llvm = use_llvm,
+        .use_lld = use_llvm,
     });
 
     b.installArtifact(gallery_exe);

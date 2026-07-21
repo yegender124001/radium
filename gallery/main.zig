@@ -10,4 +10,7 @@ pub fn main(init: std.process.Init) !void {
 
     const window = try radium.Window.init(gpa);
     defer window.deinit();
+
+    window.shown.set(true);
+    window.shown.set(false);
 }
