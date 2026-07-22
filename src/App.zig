@@ -10,6 +10,7 @@ const wayland = @import("Wayland/platform.zig");
 
 allocator: Allocator,
 platform: Platform,
+runing: bool = true,
 
 var instance: ?*Self = null;
 
@@ -51,4 +52,10 @@ pub fn deinit(self: *Self) void {
     // AND ABOVE FROM THIS LINE.
 
     instance = null;
+}
+
+pub fn run(self: *Self) !void {
+    while (self.runing) {
+        _ = try self.platform.poll();
+    }
 }

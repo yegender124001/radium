@@ -7,11 +7,12 @@ const Element = @import("radium.zig").Element;
 const Surface = @import("Surface.zig");
 
 const Self = @This();
+const Size = @Vector(2, u32);
 
 allocator: Allocator,
 width: Property(u32),
 height: Property(u32),
-title: Property([]const u8),
+title: Property([:0]const u8),
 shown: Property(bool),
 element: *Element,
 surface: ?Surface = null,
@@ -20,6 +21,7 @@ app: *App,
 fn widthChanged(self: *Self) void {
     const new_width = self.width.get();
     if (self.element.width.get() != new_width) {
+        if (self.surface) |sur| sur.setSize(.{ self.width.get(), self.height.get() });
         self.element.width.set(new_width);
     }
 }
@@ -27,6 +29,7 @@ fn widthChanged(self: *Self) void {
 fn heightChanged(self: *Self) void {
     const new_height = self.height.get();
     if (self.element.height.get() != new_height) {
+        if (self.surface) |sur| sur.setSize(.{ self.width.get(), self.height.get() });
         self.element.height.set(new_height);
     }
 }
@@ -45,15 +48,37 @@ fn elementHeightChanged(self: *Self) void {
     }
 }
 
+fn closeCb(self: *Self) void {
+    self.shown.set(false);
+}
+
 fn show(self: *Self) void {
+    if (self.surface != null) return;
+
     self.surface = self.app.platform.createSurface() catch return;
 
+    if (self.surface) |sur| {
+        sur.setResizeCallback(*Self, self, resizeCallback);
+        sur.setCloseCallback(*Self, self, closeCb);
+        sur.setSize(.{ self.width.get(), self.height.get() });
+        sur.setTitle(self.title.get());
+    }
     // Fix these functions to return errors
+}
+
+fn titleChanged(self: *Self) void {
+    if (self.surface) |sur| sur.setTitle(self.title.get());
+}
+
+fn resizeCallback(self: *Self, size: Size) void {
+    self.width.set(size[0]);
+    self.height.set(size[1]);
 }
 
 fn hide(self: *Self) void {
     if (self.surface) |s| {
         s.deinit();
+        self.app.runing = false;
     }
 }
 
@@ -90,6 +115,7 @@ pub fn init(allocator: Allocator) !*Self {
     _ = try ptr.element.height.connect(*Self, ptr, elementHeightChanged);
 
     _ = try ptr.shown.connect(*Self, ptr, showChanged);
+    _ = try ptr.title.connect(*Self, ptr, titleChanged);
 
     return ptr;
 }

@@ -1,9 +1,11 @@
 const Platform = @import("../Platform.zig");
 const Surface = @import("../Surface.zig");
-
+const Client = @import("Client.zig");
+const XdgSurface = @import("XdgSurface.zig");
 const std = @import("std");
 
 allocator: std.mem.Allocator,
+client: *Client,
 
 const Self = @This();
 
@@ -12,13 +14,14 @@ pub fn init(allocator: std.mem.Allocator) !Platform {
 
     ptr.* = .{
         .allocator = allocator,
+        .client = try Client.init(allocator),
     };
 
     return .{
         .ptr = @ptrCast(ptr),
         .vtable = .{
             .deinit = deinit,
-            .createSurface = createSurface,
+            .createSurface = XdgSurface.__createSurface,
             .poll = poll,
         },
     };
@@ -26,18 +29,13 @@ pub fn init(allocator: std.mem.Allocator) !Platform {
 
 fn deinit(ptr: *anyopaque) void {
     const self: *Self = @ptrCast(@alignCast(ptr));
+    self.client.deinit();
     const allocator = self.allocator;
     allocator.destroy(self);
 }
 
-fn createSurface(ptr: *anyopaque) !Surface {
+fn poll(ptr: *anyopaque) !bool {
     const self: *Self = @ptrCast(@alignCast(ptr));
-    _ = self;
-
-    return .{};
-}
-
-fn poll(ptr: *anyopaque) !void {
-    const self: *Self = @ptrCast(@alignCast(ptr));
-    _ = self;
+    _ = self.client.display.dispatch();
+    return true;
 }

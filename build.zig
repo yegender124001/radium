@@ -13,18 +13,37 @@ pub fn build(b: *std.Build) !void {
 
     const use_llvm = b.option(bool, "llvm", "Use LLVM");
 
+    // Xdg Shell
     scanner.addSystemProtocol("stable/xdg-shell/xdg-shell.xml");
+    scanner.generate("xdg_wm_base", 5);
+
+    // Xdg Decoration
     scanner.addSystemProtocol("unstable/xdg-decoration/xdg-decoration-unstable-v1.xml");
+    scanner.generate("zxdg_decoration_manager_v1", 1);
+
+    // Wlroots Layer Shell
     scanner.addCustomProtocol(b.path("protocols/wlr-layer-shell-unstable-v1.xml"));
+    scanner.generate("zwlr_layer_shell_v1", 4);
+
+    // Linux dma buf
+    scanner.addSystemProtocol("stable/linux-dmabuf/linux-dmabuf-v1.xml");
+    scanner.generate("zwp_linux_dmabuf_v1", 4);
+
+    // Wp viewporter
+    scanner.addSystemProtocol("stable/viewporter/viewporter.xml");
+    scanner.generate("wp_viewporter", 1);
+
+    // Fractional Scale
+    scanner.addSystemProtocol("staging/fractional-scale/fractional-scale-v1.xml");
+    scanner.generate("wp_fractional_scale_manager_v1", 1);
+
+    // Wayland internals
     scanner.generate("wl_compositor", 6);
     scanner.generate("wl_shm", 2);
     scanner.generate("wl_seat", 9);
     scanner.generate("wl_output", 4);
     scanner.generate("wl_subcompositor", 1);
-    scanner.generate("zwlr_layer_shell_v1", 4);
-    scanner.generate("xdg_wm_base", 5);
-    scanner.generate("zxdg_decoration_manager_v1", 1);
-    // Radium is supposed to be external project
+
     const radium_mod = b.addModule("radium", .{
         .link_libc = true,
         .root_source_file = b.path("src/radium.zig"),

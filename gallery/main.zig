@@ -12,5 +12,7 @@ pub fn main(init: std.process.Init) !void {
     defer window.deinit();
 
     window.shown.set(true);
-    window.shown.set(false);
+    // window.shown.set(false);
+
+    _ = try app.run();
 }
