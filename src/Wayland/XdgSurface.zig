@@ -140,8 +140,11 @@ fn draw(self: *Self) !void {
     const fd = os.memfd_create("radium-client", 0);
     if (fd == -1) return error.FailedToCreateMemfd;
 
-    const width = self.width;
-    const height = self.height;
+    const scale: f32 = (@as(f32, @floatFromInt(self.preferedScale)) / 120.0);
+    const fwidth: f32 = @as(f32, @floatFromInt(self.width)) * scale;
+    const fheight: f32 = @as(f32, @floatFromInt(self.height)) * scale;
+    const width = @as(u32, @round(fwidth));
+    const height = @as(u32, @round(fheight));
     const stride = width * 4;
     const size = stride * height;
 
@@ -165,10 +168,11 @@ fn draw(self: *Self) !void {
     const pixelCount = @as(usize, @intCast(width)) * @as(usize, @intCast(height));
     const image = pixl[0..pixelCount];
 
-    @memset(image, 0xFFFFFFFF);
+    @memset(image, 0xFF222222);
 
     self.surface.attach(wlBuffer, 0, 0);
     self.surface.damageBuffer(0, 0, @intCast(width), @intCast(height));
+    self.viewport.setDestination(@intCast(self.width), @intCast(self.height));
     self.xdgSurface.setWindowGeometry(0, 0, @intCast(width), @intCast(height));
     self.surface.commit();
 
