@@ -9,7 +9,6 @@ pub const VTable = struct {
     setTitle: ?*const fn (*anyopaque, [:0]const u8) void = null,
     setClose: *const fn (*anyopaque, *anyopaque, *const fn (*anyopaque) void) void,
     setResizeCallback: ?*const fn (*anyopaque, *anyopaque, *const fn (*anyopaque, Size) void) void = null,
-    // getFrame: *const fn(*anyopaque)
 };
 
 vtable: VTable,

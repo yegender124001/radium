@@ -6,7 +6,7 @@ const Surface = @import("../Surface.zig");
 const zxdg = @import("wayland").client.zxdg;
 const wp = @import("wayland").client.wp;
 const os = @import("std").os.linux;
-
+const shmCb = @import("../ShmCapability.zig");
 const Self = @This();
 
 allocator: std.mem.Allocator,
@@ -24,6 +24,8 @@ state: State = .{},
 wmCapabilities: WmCapabilities = .{},
 resizeCallback: ?ResizeCallback = null,
 closeCallback: ?CloseCallback = null,
+queueBuffer: ?*BufferContext = null,
+presented: bool = false,
 
 const State = struct {
     maximized: bool = false,
@@ -95,8 +97,13 @@ fn xdgSurfaceListener(xdgSrfc: *xdg.Surface, event: xdg.Surface.Event, self: *Se
     switch (event) {
         .configure => |e| {
             xdgSrfc.ackConfigure(e.serial);
-            if (self.width > 0 and self.height > 0) {
-                self.draw() catch return;
+            if (self.state.resizing == true) {
+                self.viewport.setDestination(@intCast(self.width), @intCast(self.height));
+                self.xdgSurface.setWindowGeometry(0, 0, @intCast(self.width), @intCast(self.height));
+                self.surface.commit();
+            }
+            if (self.resizeCallback) |cb| {
+                cb.func(cb.ptr, .{ @intCast(self.width), @intCast(self.height) });
             }
         },
     }
@@ -115,10 +122,6 @@ fn xdgToplevelListener(toplevel: *xdg.Toplevel, event: xdg.Toplevel.Event, self:
             if ((e.width == 0) or (e.height == 0)) return;
             self.width = @intCast(e.width);
             self.height = @intCast(e.height);
-
-            if (self.resizeCallback) |cb| {
-                cb.func(cb.ptr, .{ @intCast(e.width), @intCast(e.height) });
-            }
         },
         .configure_bounds => {},
         .wm_capabilities => |e| {
@@ -136,7 +139,47 @@ fn fractionalScaleListener(scale: *wp.FractionalScaleV1, event: wp.FractionalSca
     }
 }
 
-fn draw(self: *Self) !void {
+const BufferContext = struct {
+    shmPool: *wl.ShmPool,
+    buffer: *wl.Buffer,
+    width: u32,
+    height: u32,
+    stride: u32,
+    addr: usize,
+    fd: usize,
+};
+
+fn frameListener(cb: *wl.Callback, event: wl.Callback.Event, self: *Self) void {
+    switch (event) {
+        .done => {
+            cb.destroy();
+            self.presented = true;
+
+            self.draw();
+        },
+    }
+}
+
+fn draw(self: *Self) void {
+    if (self.queueBuffer) |qb| {
+        const size = qb.stride * qb.height;
+        self.surface.attach(qb.buffer, 0, 0);
+        self.surface.damageBuffer(0, 0, @intCast(qb.width), @intCast(qb.height));
+        self.viewport.setDestination(@intCast(self.width), @intCast(self.height));
+        self.xdgSurface.setWindowGeometry(0, 0, @intCast(self.width), @intCast(self.height));
+        self.surface.commit();
+
+        qb.shmPool.destroy();
+        qb.buffer.destroy();
+
+        _ = os.munmap(@ptrFromInt(qb.addr), @intCast(size));
+        _ = os.close(@intCast(qb.fd));
+
+        self.allocator.destroy(qb);
+    }
+}
+
+fn acquireBuffer(self: *Self) !*BufferContext {
     const fd = os.memfd_create("radium-client", 0);
     if (fd == -1) return error.FailedToCreateMemfd;
 
@@ -154,13 +197,7 @@ fn draw(self: *Self) !void {
     }
 
     const shmPool = try self.client.shm.createPool(@intCast(fd), @intCast(size));
-    const wlBuffer = try shmPool.createBuffer(
-        0,
-        @intCast(width),
-        @intCast(height),
-        @intCast(stride),
-        .argb8888,
-    );
+    const wlBuffer = try shmPool.createBuffer(0, @intCast(width), @intCast(height), @intCast(stride), .argb8888);
 
     const addr = os.mmap(null, @intCast(size), .{ .READ = true, .WRITE = true }, .{ .TYPE = .SHARED }, @intCast(fd), 0);
 
@@ -170,15 +207,34 @@ fn draw(self: *Self) !void {
 
     @memset(image, 0xFF222222);
 
-    self.surface.attach(wlBuffer, 0, 0);
-    self.surface.damageBuffer(0, 0, @intCast(width), @intCast(height));
-    self.viewport.setDestination(@intCast(self.width), @intCast(self.height));
-    self.xdgSurface.setWindowGeometry(0, 0, @intCast(width), @intCast(height));
-    self.surface.commit();
+    const ptr = try self.allocator.create(BufferContext);
 
-    shmPool.destroy();
-    wlBuffer.destroy();
-    _ = os.close(@intCast(fd));
+    ptr.* = .{
+        .addr = addr,
+        .buffer = wlBuffer,
+        .shmPool = shmPool,
+        .width = width,
+        .fd = fd,
+        .height = height,
+        .stride = stride,
+    };
+
+    return ptr;
+}
+
+fn presentBuffer(self: *Self, buffer: *BufferContext, damage: ?@Vector(4, u32)) void {
+    _ = damage;
+
+    self.queueBuffer = buffer;
+    self.draw();
+    // self.presented = true;
+    // std.debug.print("Presented!", .{});
+    // if (self.presented == false) {} else {
+    //     const frame = self.surface.frame() catch return;
+    //     self.queueBuffer = buffer;
+    //     frame.setListener(*Self, frameListener, self);
+    //     self.surface.commit();
+    // }
 }
 
 pub fn init(allocator: std.mem.Allocator, client: *const Client) !*Self {
@@ -224,8 +280,6 @@ pub fn init(allocator: std.mem.Allocator, client: *const Client) !*Self {
     srfc.commit();
     _ = client.display.dispatch();
 
-    _ = try self.draw();
-
     return self;
 }
 
@@ -240,7 +294,19 @@ pub fn deinit(self: *Self) void {
 }
 
 pub fn setSize(self: *Self, size: @Vector(2, u32)) void {
-    self.xdgSurface.setWindowGeometry(0, 0, @intCast(size[0]), @intCast(size[1]));
+    if (size[0] == 0 or size[1] == 0) return;
+    if (self.width == size[0] and self.height == size[1]) return;
+
+    self.width = size[0];
+    self.height = size[1];
+
+    self.viewport.setDestination(@intCast(self.width), @intCast(self.height));
+    self.xdgSurface.setWindowGeometry(0, 0, @intCast(self.width), @intCast(self.height));
+    self.surface.commit();
+
+    if (self.resizeCallback) |cb| {
+        cb.func(cb.ptr, size);
+    }
 }
 
 pub fn setTitle(self: *Self, title: [:0]const u8) void {
@@ -258,7 +324,10 @@ pub fn __createSurface(ptr: *anyopaque) !Surface {
 
     return .{
         .ptr = @ptrCast(srfc),
-        .capability = .{ .SHM = .{} },
+        .capability = .{ .SHM = .{ .ptr = @ptrCast(srfc), .vtable = &.{
+            .acquireBuffer = __acquireBuffer,
+            .presentBuffer = __presentBuffer,
+        } } },
         .vtable = .{
             .deinit = __deinitSurface,
             .setSize = __setSurfaceSize,
@@ -267,6 +336,25 @@ pub fn __createSurface(ptr: *anyopaque) !Surface {
             .setClose = __setSurfaceCloseCallback,
         },
     };
+}
+
+fn __acquireBuffer(ptr: *anyopaque) anyerror!shmCb.Buffer {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    const buffer = try self.acquireBuffer();
+    return .{
+        .ptr = @ptrCast(@constCast(buffer)),
+        .width = buffer.width,
+        .height = buffer.height,
+        .stride = buffer.stride,
+        .addr = buffer.addr,
+    };
+}
+
+fn __presentBuffer(ptr: *anyopaque, buffer: shmCb.Buffer, damage: ?@Vector(4, u32)) void {
+    const self: *Self = @ptrCast(@alignCast(ptr));
+    const buf: *BufferContext = @ptrCast(@alignCast(buffer.ptr));
+
+    self.presentBuffer(buf, damage);
 }
 
 fn __deinitSurface(ptr: *anyopaque) void {

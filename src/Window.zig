@@ -10,41 +10,28 @@ const Self = @This();
 const Size = @Vector(2, u32);
 
 allocator: Allocator,
-width: Property(u32),
-height: Property(u32),
+width: *Property(u32),
+height: *Property(u32),
 title: Property([:0]const u8),
 shown: Property(bool),
 element: *Element,
 surface: ?Surface = null,
 app: *App,
+in_resize_callback: bool = false,
 
 fn widthChanged(self: *Self) void {
-    const new_width = self.width.get();
-    if (self.element.width.get() != new_width) {
-        if (self.surface) |sur| sur.setSize(.{ self.width.get(), self.height.get() });
-        self.element.width.set(new_width);
+    if (self.in_resize_callback) return;
+    if (self.surface) |sur| {
+        sur.setSize(.{ self.width.get(), self.height.get() });
+        self.draw();
     }
 }
 
 fn heightChanged(self: *Self) void {
-    const new_height = self.height.get();
-    if (self.element.height.get() != new_height) {
-        if (self.surface) |sur| sur.setSize(.{ self.width.get(), self.height.get() });
-        self.element.height.set(new_height);
-    }
-}
-
-fn elementWidthChanged(self: *Self) void {
-    const new_width = self.element.width.get();
-    if (self.width.get() != new_width) {
-        self.width.set(new_width);
-    }
-}
-
-fn elementHeightChanged(self: *Self) void {
-    const new_height = self.element.height.get();
-    if (self.height.get() != new_height) {
-        self.height.set(new_height);
+    if (self.in_resize_callback) return;
+    if (self.surface) |sur| {
+        sur.setSize(.{ self.width.get(), self.height.get() });
+        self.draw();
     }
 }
 
@@ -57,28 +44,45 @@ fn show(self: *Self) void {
 
     self.surface = self.app.platform.createSurface() catch return;
 
-    if (self.surface) |sur| {
+    if (self.surface) |*sur| {
         sur.setResizeCallback(*Self, self, resizeCallback);
         sur.setCloseCallback(*Self, self, closeCb);
         sur.setSize(.{ self.width.get(), self.height.get() });
         sur.setTitle(self.title.get());
+
+        self.draw();
     }
     // Fix these functions to return errors
 }
 
 fn titleChanged(self: *Self) void {
-    if (self.surface) |sur| sur.setTitle(self.title.get());
+    if (self.surface) |*sur| sur.setTitle(self.title.get());
+}
+
+fn draw(self: *Self) void {
+    if (self.surface) |*sur| {
+        const buffer = sur.capability.SHM.acquireBuffer() catch return;
+        sur.capability.SHM.presentBuffer(buffer, null);
+    }
 }
 
 fn resizeCallback(self: *Self, size: Size) void {
+    const width = self.width.get();
+    const height = self.height.get();
+    if (width == size[0] and height == size[1]) return;
+
+    self.in_resize_callback = true;
     self.width.set(size[0]);
     self.height.set(size[1]);
+    self.in_resize_callback = false;
+    self.draw();
 }
 
 fn hide(self: *Self) void {
-    if (self.surface) |s| {
+    if (self.surface) |*s| {
         s.deinit();
         self.app.runing = false;
+        self.surface = null;
     }
 }
 
@@ -99,30 +103,30 @@ pub fn init(allocator: Allocator) !*Self {
     ptr.* = .{
         .app = try App.getInstance(),
         .allocator = allocator,
-        .width = try .init(allocator, 640),
-        .height = try .init(allocator, 480),
+        .width = undefined,
+        .height = undefined,
         .title = try .init(allocator, "Hello World"),
         .element = try .init(allocator, null),
         .shown = try .init(allocator, true),
     };
 
+    ptr.*.width = &ptr.element.width;
+    ptr.*.height = &ptr.element.height;
+
     // If someone changed the width of this structure
     _ = try ptr.width.connect(*Self, ptr, widthChanged);
     _ = try ptr.height.connect(*Self, ptr, heightChanged);
 
-    // Ofcourse someone would try to change the property of the element
-    _ = try ptr.element.width.connect(*Self, ptr, elementWidthChanged);
-    _ = try ptr.element.height.connect(*Self, ptr, elementHeightChanged);
-
     _ = try ptr.shown.connect(*Self, ptr, showChanged);
     _ = try ptr.title.connect(*Self, ptr, titleChanged);
+
+    ptr.width.set(150);
+    ptr.height.set(150);
 
     return ptr;
 }
 
 pub fn deinit(self: *Self) void {
-    self.width.destroy();
-    self.height.destroy();
     self.title.destroy();
     self.shown.destroy();
 
