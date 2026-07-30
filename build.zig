@@ -1,17 +1,21 @@
 const std = @import("std");
-
 const Scanner = @import("wayland").Scanner;
 
-pub fn build(b: *std.Build) !void {
+pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
-
     const optimize = b.standardOptimizeOption(.{});
+
+    const llvm = b.option(
+        bool,
+        "llvm",
+        "Use LLVM and LLD for compiling, can be usefull in debugging",
+    );
 
     const scanner = Scanner.create(b, .{});
 
-    const wayland = b.createModule(.{ .root_source_file = scanner.result });
-
-    const use_llvm = b.option(bool, "llvm", "Use LLVM");
+    const wayland = b.createModule(.{
+        .root_source_file = scanner.result,
+    });
 
     // Xdg Shell
     scanner.addSystemProtocol("stable/xdg-shell/xdg-shell.xml");
@@ -44,42 +48,48 @@ pub fn build(b: *std.Build) !void {
     scanner.generate("wl_output", 4);
     scanner.generate("wl_subcompositor", 1);
 
-    const radium_mod = b.addModule("radium", .{
+    const mod = b.addModule("radium", .{
         .link_libc = true,
-        .root_source_file = b.path("src/radium.zig"),
-        .optimize = optimize,
-        .target = target,
-    });
-    radium_mod.addImport("wayland", wayland);
-    radium_mod.linkSystemLibrary("wayland-client", .{});
-
-    const radium_test = b.addTest(.{
-        .root_module = radium_mod,
-        .use_llvm = use_llvm,
-        .use_lld = use_llvm,
-    });
-    const run_radium_test = b.addRunArtifact(radium_test);
-    const radium_test_step = b.step("test", "Run tests");
-    radium_test_step.dependOn(&run_radium_test.step);
-
-    const gallery_mod = b.addModule("gallery", .{
-        .root_source_file = b.path("gallery/main.zig"),
+        .root_source_file = b.path("src/root.zig"),
         .optimize = optimize,
         .target = target,
     });
 
-    gallery_mod.addImport("radium", radium_mod);
+    mod.addImport("wayland", wayland);
+    mod.linkSystemLibrary("wayland-client", .{});
 
-    const gallery_exe = b.addExecutable(.{
-        .name = "gallery",
-        .root_module = gallery_mod,
-        .use_llvm = use_llvm,
-        .use_lld = use_llvm,
+    const mod_test = b.addTest(.{
+        .root_module = mod,
+        .use_lld = llvm,
+        .use_llvm = llvm,
     });
 
-    b.installArtifact(gallery_exe);
+    const run_test = b.addRunArtifact(mod_test);
+    const test_step = b.step("test", "Run tests");
+    test_step.dependOn(&run_test.step);
 
-    const run_gallery = b.addRunArtifact(gallery_exe);
-    const run_gallery_step = b.step("gallery", "Run widget gallery");
-    run_gallery_step.dependOn(&run_gallery.step);
+    /////////////////////////////////////////////////////////
+    /////////////////   examples    ////////////////////////
+    ///////////////////////////////////////////////////////
+
+    // Example 1
+    const example_p1 = b.addExecutable(.{
+        .name = "p1",
+        .root_module = b.addModule("p1", .{
+            .root_source_file = b.path("example/p1.zig"),
+            .link_libc = true,
+            .target = target,
+            .optimize = optimize,
+        }),
+        .use_lld = llvm,
+        .use_llvm = llvm,
+    });
+
+    example_p1.root_module.addImport("radium", mod);
+    b.installArtifact(example_p1);
+
+    const run_p1 = b.addRunArtifact(example_p1);
+
+    const run_p1_test = b.step("p1", "Run Example 1");
+    run_p1_test.dependOn(&run_p1.step);
 }

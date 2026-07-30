@@ -1,12 +1,13 @@
 .{
     .name = .radium,
-    .version = "0.16.0",
+    .version = "0.0.1",
     .dependencies = .{
         .wayland = .{
-            .url = "git+https://github.com/ifreund/zig-wayland.git#a8e10e87e5ebb49ce518ac3d2198909c87ee615a",
-            .hash = "wayland-0.7.0-dev-lQa1kjT8AQDBstL61Gy3WCMtGwVaMN1p6w5wGfdDvP15",
+            .url = "git+https://codeberg.org/ifreund/zig-wayland.git#23839e41161de025d71ce082561ecba1c5331281",
+            .hash = "wayland-0.7.0-dev-lQa1kl38AQC-kQolS5D4jV1GJ2rH2jv1VWHr14YLVnyn",
         },
     },
-    .paths = .{ "build.zig", "build.zig.zon", "src/radium.zig" },
-    .fingerprint = 0xc1735339123db893,
+    .minimum_zig_version = "0.16.0",
+    .paths = .{""},
+    .fingerprint = 0xc1735339649cd0d0,
 }

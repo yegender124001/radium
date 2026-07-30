@@ -1,0 +1,146 @@
+const std = @import("std");
+const wl = @import("wayland").client.wl;
+const xdg = @import("wayland").client.xdg;
+const Log = @import("../../../root.zig").Log;
+const Surface = @import("surface.zig");
+const Self = @This();
+
+allocator: std.mem.Allocator,
+display: *wl.Display,
+registry: *wl.Registry,
+compositor: ?*wl.Compositor = null,
+shm: ?*wl.Shm = null,
+xdgWmBase: ?*xdg.WmBase = null,
+
+fn xdgWmBaseListener(
+    wmBase: *xdg.WmBase,
+    event: xdg.WmBase.Event,
+    self: *Self,
+) void {
+    _ = self;
+    switch (event) {
+        .ping => |e| {
+            wmBase.pong(e.serial);
+        },
+    }
+}
+
+fn registryListener(
+    reg: *wl.Registry,
+    event: wl.Registry.Event,
+    self: *Self,
+) void {
+    switch (event) {
+        .global => |e| {
+            if (std.mem.orderZ(u8, e.interface, wl.Compositor.interface.name) == .eq) {
+                self.compositor = reg.bind(e.name, wl.Compositor, e.version) catch return;
+            } else if (std.mem.orderZ(u8, e.interface, wl.Shm.interface.name) == .eq) {
+                self.shm = reg.bind(e.name, wl.Shm, e.version) catch return;
+            } else if (std.mem.orderZ(u8, e.interface, xdg.WmBase.interface.name) == .eq) {
+                self.xdgWmBase = reg.bind(e.name, xdg.WmBase, e.version) catch return;
+                self.xdgWmBase.?.setListener(*Self, xdgWmBaseListener, self);
+            }
+        },
+        .global_remove => {},
+    }
+}
+
+pub fn create(allocator: std.mem.Allocator) !*Self {
+    const self = try allocator.create(Self);
+    errdefer {
+        Log(@src(), .Error, "Failed to allocate memory");
+        allocator.destroy(self);
+    }
+
+    const display = try wl.Display.connect(null);
+    errdefer {
+        Log(@src(), .Error, "Failed to connect to wl_display");
+        display.disconnect();
+        allocator.destroy(self);
+    }
+    const registry = try display.getRegistry();
+    errdefer {
+        Log(@src(), .Error, "Failed to create wl_registry");
+        registry.destroy();
+        display.disconnect();
+        allocator.destroy(self);
+    }
+
+    self.* = .{
+        .allocator = allocator,
+        .display = display,
+        .registry = registry,
+    };
+
+    registry.setListener(*Self, registryListener, self);
+
+    _ = display.roundtrip();
+
+    if (self.compositor == null) {
+        Log(@src(), .Error, "No Compositor");
+        return error.NoCompositor;
+    }
+
+    if (self.shm == null) {
+        Log(@src(), .Error, "No wl_shm");
+        return error.NoSHM;
+    }
+
+    if (self.xdgWmBase == null) {
+        Log(@src(), .Error, "No xdg_wm_base");
+        return error.NoXdgWmBase;
+    }
+
+    return self;
+}
+
+pub fn destroy(self: *Self) void {
+    if (self.xdgWmBase) |base| base.destroy();
+
+    if (self.shm) |shm| shm.destroy();
+
+    if (self.compositor) |comp| comp.destroy();
+
+    self.registry.destroy();
+
+    self.display.disconnect();
+
+    const allocator = self.allocator;
+    allocator.destroy(self);
+}
+
+pub fn createSurface(self: *Self) !*anyopaque {
+    if (self.compositor) |comp| {
+        return @ptrCast(try Surface.createSurface(self.allocator, comp));
+    } else {
+        return error.NoCompositor;
+    }
+}
+
+pub fn assignToplevel(self: *Self, srfc: *anyopaque) !void {
+    const surface: *Surface = @ptrCast(@alignCast(srfc));
+    if (self.xdgWmBase) |base| {
+        return surface.assignXdgToplevel(base);
+    } else {
+        return error.NoXDGWMBase;
+    }
+}
+
+pub fn assignShm(self: *Self, srfc: *anyopaque) !void {
+    const surface: *Surface = @ptrCast(@alignCast(srfc));
+    if (self.shm) |shm| {
+        return surface.assignSHM(shm);
+    } else {
+        return error.NoShm;
+    }
+}
+
+pub fn destroySurface(_: *Self, srfc: *anyopaque) void {
+    const surface: *Surface = @ptrCast(@alignCast(srfc));
+    surface.deinit();
+}
+
+pub fn surfaceWantsClose(_: *Self, srfc: *anyopaque) bool {
+    const surface: *Surface = @ptrCast(@alignCast(srfc));
+    return surface.wantsClose;
+}
