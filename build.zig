@@ -55,8 +55,17 @@ pub fn build(b: *std.Build) void {
         .target = target,
     });
 
+    mod.addSystemIncludePath(.{ .cwd_relative = "/usr/include/cairo/" });
+    mod.addSystemIncludePath(.{ .cwd_relative = "/usr/include/freetype2/" });
+    mod.addSystemIncludePath(.{ .cwd_relative = "/usr/include/pixman-1/" });
+    mod.addSystemIncludePath(.{ .cwd_relative = "/usr/include/libpng16/" });
+    mod.addSystemIncludePath(.{ .cwd_relative = "/usr/include/harfbuzz/" });
     mod.addImport("wayland", wayland);
     mod.linkSystemLibrary("wayland-client", .{});
+    mod.linkSystemLibrary("cairo", .{});
+    mod.linkSystemLibrary("freetype2", .{});
+    mod.linkSystemLibrary("pixman-1", .{});
+    mod.linkSystemLibrary("png16", .{});
 
     const mod_test = b.addTest(.{
         .root_module = mod,
