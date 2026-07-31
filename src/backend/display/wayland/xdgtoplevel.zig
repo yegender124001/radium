@@ -1,6 +1,7 @@
 const std = @import("std");
 const wl = @import("wayland").client.wl;
 const xdg = @import("wayland").client.xdg;
+const zxdg = @import("wayland").client.zxdg;
 const Log = @import("../../../root.zig").Log;
 const Self = @This();
 
@@ -63,6 +64,7 @@ pub fn createXdgToplevel(
     allocator: std.mem.Allocator,
     srfc: *wl.Surface,
     base: *xdg.WmBase,
+    decor: ?*zxdg.DecorationManagerV1,
 ) !*Self {
     const self = try allocator.create(Self);
     errdefer {
@@ -82,6 +84,10 @@ pub fn createXdgToplevel(
         toplevel.destroy();
         surface.destroy();
         allocator.destroy(self);
+    }
+
+    if (decor) |d| {
+        _ = try d.getToplevelDecoration(toplevel);
     }
 
     self.* = .{

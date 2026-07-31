@@ -1,5 +1,6 @@
 const wl = @import("wayland").client.wl;
 const xdg = @import("wayland").client.xdg;
+const zxdg = @import("wayland").client.zxdg;
 const XdgToplevel = @import("xdgtoplevel.zig");
 const std = @import("std");
 
@@ -53,8 +54,8 @@ pub fn setCloseCallback(
     }
 }
 
-pub fn createXdgToplevel(allocator: std.mem.Allocator, base: *xdg.WmBase, surface: *wl.Surface) !Self {
-    const toplevel = try XdgToplevel.createXdgToplevel(allocator, surface, base);
+pub fn createXdgToplevel(allocator: std.mem.Allocator, base: *xdg.WmBase, decor: ?*zxdg.DecorationManagerV1, surface: *wl.Surface) !Self {
+    const toplevel = try XdgToplevel.createXdgToplevel(allocator, surface, base, decor);
 
     return .{ .role = .{
         .XdgToplevel = toplevel,

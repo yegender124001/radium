@@ -1,6 +1,7 @@
 const Self = @This();
 const std = @import("std");
 const xdg = @import("wayland").client.xdg;
+const zxdg = @import("wayland").client.zxdg;
 const wl = @import("wayland").client.wl;
 const Log = @import("../../../root.zig").Log;
 const Role = @import("role.zig");
@@ -10,22 +11,35 @@ allocator: std.mem.Allocator,
 surface: *wl.Surface,
 role: ?Role = null,
 graphics: ?Graphics = null,
-width: i32 = 100,
-height: i32 = 100,
+width: i32 = 1280,
+height: i32 = 720,
 initialConfigured: bool = false,
 wantsClose: bool = false,
 
-fn draw(_: *Self, _: usize) void {}
+pub fn draw(_: *Self, _: usize) void {}
+
+fn frameListener(cb: *wl.Callback, event: wl.Callback.Event, self: *Self) void {
+    switch (event) {
+        .done => {
+            const callback = self.surface.frame() catch return;
+            callback.setListener(*Self, frameListener, self);
+
+            const buffer = self.graphics.?.getBuffer(*Self, self, draw) catch return;
+            self.surface.attach(buffer, 0, 0);
+            self.surface.damage(0, 0, self.width, self.height);
+            self.surface.commit();
+
+            cb.destroy();
+        },
+    }
+}
 
 fn onConfigure(self: *Self, nw: i32, nh: i32) void {
     var width = self.width;
     var height = self.height;
     if (nw == self.width and nh == self.height) return;
 
-    if (nw == 0 or nh == 0) {
-        if (self.initialConfigured == true) return;
-        self.initialConfigured = true;
-    } else {
+    if (nw == 0 or nh == 0) {} else {
         width = nw;
         height = nh;
     }
@@ -35,10 +49,16 @@ fn onConfigure(self: *Self, nw: i32, nh: i32) void {
 
     if (self.graphics) |g| {
         g.resize(width, height) catch return;
-        const buffer = g.getBuffer(*Self, self, draw) catch return;
-        self.surface.attach(buffer, 0, 0);
-        self.surface.damage(0, 0, width, height);
-        self.surface.commit();
+        if (!self.initialConfigured) {
+            const buffer = g.getBuffer(*Self, self, draw) catch return;
+            self.surface.attach(buffer, 0, 0);
+            self.surface.damage(0, 0, width, height);
+
+            const frame = self.surface.frame() catch return;
+            frame.setListener(*Self, frameListener, self);
+            self.surface.commit();
+            self.initialConfigured = true;
+        }
     }
 }
 
@@ -46,12 +66,12 @@ fn onClose(self: *Self) void {
     self.wantsClose = true;
 }
 
-pub fn assignXdgToplevel(self: *Self, base: *xdg.WmBase) !void {
+pub fn assignXdgToplevel(self: *Self, base: *xdg.WmBase, decor: ?*zxdg.DecorationManagerV1) !void {
     if (self.role) |_| {
         return error.RoleAlreadyAssigned;
     }
 
-    self.role = try .createXdgToplevel(self.allocator, base, self.surface);
+    self.role = try .createXdgToplevel(self.allocator, base, decor, self.surface);
     self.role.?.setUserData(*Self, self);
     self.role.?.setConfigureCallback(*Self, onConfigure);
     self.role.?.setCloseCallback(*Self, onClose);

@@ -1,6 +1,7 @@
 const std = @import("std");
 const wl = @import("wayland").client.wl;
 const xdg = @import("wayland").client.xdg;
+const zxdg = @import("wayland").client.zxdg;
 const Log = @import("../../../root.zig").Log;
 const Surface = @import("surface.zig");
 const Self = @This();
@@ -11,6 +12,7 @@ registry: *wl.Registry,
 compositor: ?*wl.Compositor = null,
 shm: ?*wl.Shm = null,
 xdgWmBase: ?*xdg.WmBase = null,
+xdgDecor: ?*zxdg.DecorationManagerV1 = null,
 
 fn xdgWmBaseListener(
     wmBase: *xdg.WmBase,
@@ -39,6 +41,8 @@ fn registryListener(
             } else if (std.mem.orderZ(u8, e.interface, xdg.WmBase.interface.name) == .eq) {
                 self.xdgWmBase = reg.bind(e.name, xdg.WmBase, e.version) catch return;
                 self.xdgWmBase.?.setListener(*Self, xdgWmBaseListener, self);
+            } else if (std.mem.orderZ(u8, e.interface, zxdg.DecorationManagerV1.interface.name) == .eq) {
+                self.xdgDecor = reg.bind(e.name, zxdg.DecorationManagerV1, e.version) catch return;
             }
         },
         .global_remove => {},
@@ -120,7 +124,7 @@ pub fn createSurface(self: *Self) !*anyopaque {
 pub fn assignToplevel(self: *Self, srfc: *anyopaque) !void {
     const surface: *Surface = @ptrCast(@alignCast(srfc));
     if (self.xdgWmBase) |base| {
-        return surface.assignXdgToplevel(base);
+        return surface.assignXdgToplevel(base, self.xdgDecor);
     } else {
         return error.NoXDGWMBase;
     }
