@@ -122,8 +122,11 @@ fn destroySurface(srfc: *anyopaque) void {
 
 pub fn createSurface(self: *Self, win: *rad.Window) !plat.Surface {
     if (self.compositor) |comp| {
+        const srfc: *anyopaque = @ptrCast(try Surface.createSurface(self.allocator, comp, win));
+        try self.assignShm(srfc);
+        try self.assignToplevel(srfc);
         return .{
-            .data = @ptrCast(try Surface.createSurface(self.allocator, comp, win)),
+            .data = srfc,
             .vtable = .{
                 .deinit = destroySurface,
             },

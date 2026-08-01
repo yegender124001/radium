@@ -50,4 +50,10 @@ pub fn shutdown() void {
     }
 }
 
-pub fn run() !void {}
+pub fn run() !void {
+    if (instance) |i| {
+        while (true) {
+            _ = i.platform.display.wayland.display.dispatch();
+        }
+    }
+}

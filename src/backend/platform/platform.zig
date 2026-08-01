@@ -37,8 +37,6 @@ pub fn createSurface(self: *const Self, win: *rad.Window) !Surface {
     switch (self.display) {
         .wayland => |w| {
             const srfc = try w.createSurface(win);
-            // try w.assignShm(srfc.data);
-            // try w.assignToplevel(srfc.data);
             return srfc;
         },
     }
