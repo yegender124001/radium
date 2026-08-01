@@ -35,7 +35,9 @@ Entry point for the platform implementation. It's going to initialize platform a
 ```zig
 pub const VTable = struct {
     deinit: *const fn(*anyopaque) void, // To deinit the platform
-    createSurface: *const fn(*Window) *anyopaque, // [1] Discussed below
+    createSurface: *const fn(*anyopaque, *Window) *anyopaque, // [1] Discussed below
+    createRasterBackingStore: *const fn(*anyopaque, *Window) anyerror!*anyopaque,
+    createOpenGLBackingStore: *const fn(*anyopaque, *Window) anyerror!*anyopaque,
 };
 ```
 
@@ -52,11 +54,48 @@ I think it's should be defined as:
 ```zig
 pub const VTable = struct {
     deinit: *const fn (*anyopaque) void,
-    resize: *const fn (*anyopaque, i32, i32) void,
-    title: ?*const fn (*anyopaque, String) void,
-    ...
+    setGeometry: *const fn (*anyopaque, Rect) void,
+    getGeometry: * const fn (*anyopaque) Rect,
+
+    setParent: *const fn (*anyopaque, *anyopaque) void,
+
+    setFlags: *const fn (*anyopaque, Window.Flags) void,
+    setTitle: ?*const fn (*anyopaque, String) void,
+    setMaximize: *const fn (*anyopaque, bool) void,
+    setFullScreen: *const fn (*anyopaque, bool) void,
+    isMaximized: *const fn (*anyopaque) bool,
+    isResizing: *const fn (*anyopaque) bool,
+    isFullScren: *const fn (*anyopaque) bool,
+    isActivated: *const fn (*anyopaque) bool,
+    isSuspended: *const fn (*anyopaque) bool,
+    // Something with the tiling and constriaints
+    
+    configureCallback: *const fn (*anyopaque, comptime T: type, T),
+    ... // More stuff
 }
 ```
 
 ## Platform Screen
 It's self explanatory.
+```zig
+pub const VTable = struct {
+    deinit: *const fn (*anyopaque) void,
+    getGeometry: *const fn (*anyopaque) Rect,
+    getTransform: *const fn (*anyopaque) Screen.Transform,
+    isCurrent: *const fn (*anyopaque) bool,
+    isPreferred: *const fn (*anyopaque) bool,
+    // ... Other like manufacturer. Subpixels.
+    ... // More stuff like name, etc
+}
+```
+
+## Platform Backing Store
+It will allow the surface to have a backing store either a CPU Rasterized Surface or an Open GL/Vulkan Surface. I would be doing open gl first. If I go to vulkan I should be making an RHI.
+```zig
+pub const VTable = struct {
+    deinit: *const fn (*anyopaque) void,
+    ...
+}
+```
+
+This is the plan to implement the platform abstraction layer. And I will be extending this as per need
