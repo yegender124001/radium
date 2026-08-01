@@ -3,7 +3,7 @@ const std = @import("std");
 const xdg = @import("wayland").client.xdg;
 const zxdg = @import("wayland").client.zxdg;
 const wl = @import("wayland").client.wl;
-const Log = @import("../../../root.zig").Log;
+const rad = @import("../../../root.zig");
 const Role = @import("role.zig");
 const Graphics = @import("graphics.zig");
 
@@ -15,6 +15,7 @@ width: i32 = 1280,
 height: i32 = 720,
 initialConfigured: bool = false,
 wantsClose: bool = false,
+win: *rad.Window,
 
 pub fn draw(_: *Self, _: usize) void {}
 
@@ -86,6 +87,7 @@ pub fn assignSHM(self: *Self, shm: *wl.Shm) !void {
 pub fn createSurface(
     allocator: std.mem.Allocator,
     compositor: *wl.Compositor,
+    win: *rad.Window,
 ) !*Self {
     const self = try allocator.create(Self);
     errdefer allocator.destroy(self);
@@ -94,12 +96,13 @@ pub fn createSurface(
 
     surface = try compositor.createSurface();
     errdefer {
-        Log(@src(), .Error, "Failed to create wl_surface");
+        rad.Log(@src(), .Error, "Failed to create wl_surface");
         surface.destroy();
         allocator.destroy(self);
     }
 
     self.* = .{
+        .win = win,
         .allocator = allocator,
         .surface = surface,
     };

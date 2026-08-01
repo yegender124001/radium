@@ -1,7 +1,13 @@
+pub const Surface = @import("surface.zig");
+pub const Screen = @import("screen.zig");
+pub const BackingStorer = @import("backingstore.zig");
+
+///////////////
+
 const std = @import("std");
 
 const Wayland = @import("wayland/wayland.zig");
-const Log = @import("../../root.zig").Log;
+const rad = @import("../../root.zig");
 const Display = union(enum) {
     wayland: *Wayland,
 };
@@ -27,21 +33,13 @@ pub fn deinit(self: *const Self) void {
     }
 }
 
-pub fn createSurface(self: *const Self) !*anyopaque {
+pub fn createSurface(self: *const Self, win: *rad.Window) !Surface {
     switch (self.display) {
         .wayland => |w| {
-            const srfc = try w.createSurface();
-            try w.assignShm(srfc);
-            try w.assignToplevel(srfc);
+            const srfc = try w.createSurface(win);
+            // try w.assignShm(srfc.data);
+            // try w.assignToplevel(srfc.data);
             return srfc;
-        },
-    }
-}
-
-pub fn destroySurface(self: *const Self, srfc: *anyopaque) void {
-    switch (self.display) {
-        .wayland => |w| {
-            w.destroySurface(srfc);
         },
     }
 }

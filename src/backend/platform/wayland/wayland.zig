@@ -2,8 +2,10 @@ const std = @import("std");
 const wl = @import("wayland").client.wl;
 const xdg = @import("wayland").client.xdg;
 const zxdg = @import("wayland").client.zxdg;
-const Log = @import("../../../root.zig").Log;
+const rad = @import("../../../root.zig");
+const Log = rad.Log;
 const Surface = @import("surface.zig");
+const plat = @import("../platform.zig");
 const Self = @This();
 
 allocator: std.mem.Allocator,
@@ -113,9 +115,19 @@ pub fn destroy(self: *Self) void {
     allocator.destroy(self);
 }
 
-pub fn createSurface(self: *Self) !*anyopaque {
+fn destroySurface(srfc: *anyopaque) void {
+    const surface: *Surface = @ptrCast(@alignCast(srfc));
+    surface.deinit();
+}
+
+pub fn createSurface(self: *Self, win: *rad.Window) !plat.Surface {
     if (self.compositor) |comp| {
-        return @ptrCast(try Surface.createSurface(self.allocator, comp));
+        return .{
+            .data = @ptrCast(try Surface.createSurface(self.allocator, comp, win)),
+            .vtable = .{
+                .deinit = destroySurface,
+            },
+        };
     } else {
         return error.NoCompositor;
     }
@@ -137,11 +149,6 @@ pub fn assignShm(self: *Self, srfc: *anyopaque) !void {
     } else {
         return error.NoShm;
     }
-}
-
-pub fn destroySurface(_: *Self, srfc: *anyopaque) void {
-    const surface: *Surface = @ptrCast(@alignCast(srfc));
-    surface.deinit();
 }
 
 pub fn surfaceWantsClose(_: *Self, srfc: *anyopaque) bool {

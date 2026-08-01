@@ -6,7 +6,9 @@ pub fn main(init: std.process.Init) !void {
     try rad.init(gpa);
     defer rad.shutdown();
 
-    const win = try rad.Window.create(gpa);
+    var win = try rad.Window.init(gpa);
+    defer win.deinit();
+
     try win.show();
 
     try rad.run();

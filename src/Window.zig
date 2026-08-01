@@ -2,32 +2,88 @@ const std = @import("std");
 const rad = @import("root.zig");
 const Self = @This();
 
-allocator: std.mem.Allocator,
-flags: Flags,
-rootElement: ?*rad.Element = null,
+impl: *anyopaque,
+geometryChanged: *rad.Signal,
 
 pub const Flags = struct {
     popup: bool = false,
     resizable: bool = true,
     layerSurface: bool = false,
+    opengl: bool = false,
 };
 
-pub fn create(allocator: std.mem.Allocator) !*Self {
+const WindowImpl = struct {
+    allocator: std.mem.Allocator,
+    flags: Flags = .{},
+    rootElement: ?*rad.Element = null,
+    geometry: rad.Rect = .{
+        .x = 0,
+        .y = 0,
+        .width = 600,
+        .height = 400,
+    },
+    srfc: ?rad.Platform.Surface,
+    app: *rad.Application,
+};
+
+pub fn init(allocator: std.mem.Allocator) !*Self {
     const self = try allocator.create(Self);
+    const impl = try allocator.create(WindowImpl);
+    const app = try rad.Application.getInstance();
+
     self.* = .{
+        .impl = @ptrCast(impl),
+        .geometryChanged = try rad.Signal.init(allocator),
+    };
+    impl.* = .{
+        .srfc = null,
         .allocator = allocator,
-        .flags = .{},
+        .app = app,
     };
 
     return self;
 }
 
-pub fn show(_: *Self) !void {}
+pub fn show(self: *const Self) !void {
+    const ptr: *WindowImpl = @ptrCast(@alignCast(self.impl));
+    if (ptr.srfc != null) {
+        ptr.srfc = try ptr.app.platform.createSurface(@constCast(self));
+    }
+}
 
-pub fn setRootElement(self: *Self, element: *rad.Element) void {
-    self.rootElement = element;
+pub fn hide(self: *Self) void {
+    const ptr: *WindowImpl = @ptrCast(@alignCast(self.impl));
+    if (ptr.srfc) |srfc| {
+        srfc.deinit();
+        ptr.srfc = null;
+    }
+}
+
+pub fn setRootElement(self: *const Self, element: *rad.Element) void {
+    const ptr: *WindowImpl = @ptrCast(@alignCast(self.impl));
+    ptr.rootElement = element;
+}
+
+pub fn getRootElement(self: *const Self) ?*rad.Element {
+    const ptr: *WindowImpl = @ptrCast(@alignCast(self.impl));
+    return ptr.rootElement;
+}
+
+pub fn setFlags(self: *const Self, f: Flags) !void {
+    const ptr: *WindowImpl = @ptrCast(@alignCast(self.impl));
+    ptr.flags = f;
+}
+
+pub fn getFlags(self: *const Self) Flags {
+    const ptr: *WindowImpl = @ptrCast(@alignCast(self.impl));
+    return ptr.flags;
 }
 
 pub fn deinit(self: *Self) void {
-    self.allocator.destroy(self);
+    self.geometryChanged.deinit();
+    self.hide();
+    const ptr: *WindowImpl = @ptrCast(@alignCast(self.impl));
+    const allocator = ptr.allocator;
+    allocator.destroy(ptr);
+    allocator.destroy(self);
 }

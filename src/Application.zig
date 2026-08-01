@@ -1,9 +1,11 @@
 const Self = @This();
 const std = @import("std");
+const rad = @import("root.zig");
 
 var instance: ?*Self = null;
 
 allocator: std.mem.Allocator,
+platform: rad.Platform,
 
 fn create(allocator: std.mem.Allocator) !*Self {
     if (instance) |inst| {
@@ -12,8 +14,10 @@ fn create(allocator: std.mem.Allocator) !*Self {
 
     const self = try allocator.create(Self);
 
+    const platform = try rad.Platform.createWayland(allocator);
     self.* = .{
         .allocator = allocator,
+        .platform = platform,
     };
     instance = self;
     return self;
@@ -21,6 +25,7 @@ fn create(allocator: std.mem.Allocator) !*Self {
 
 fn deinit(self: *Self) void {
     instance = null;
+    self.platform.deinit();
     self.allocator.destroy(self);
 }
 

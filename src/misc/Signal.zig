@@ -45,6 +45,6 @@ pub fn emit(self: *Self) void {
 }
 
 pub fn deinit(self: *Self) void {
-    self.listeners.deinit();
+    self.listeners.deinit(self.allocator);
     self.allocator.destroy(self);
 }
