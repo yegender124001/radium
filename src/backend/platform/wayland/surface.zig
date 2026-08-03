@@ -34,26 +34,14 @@ fn frameListener(cb: *wl.Callback, event: wl.Callback.Event, self: *Self) void {
 }
 
 fn onConfigure(self: *Self, nw: i32, nh: i32) void {
-    var width = self.width;
-    var height = self.height;
-    if (nw == self.width and nh == self.height) return;
+    self.resize(.{
+        .x = 0,
+        .y = 0,
+        .width = nw,
+        .height = nh,
+    }) catch return;
 
-    if (nw == 0 or nh == 0) {} else {
-        width = nw;
-        height = nh;
-    }
-
-    self.width = width;
-    self.height = height;
-
-    if (self.graphics) |g| {
-        g.resize(width, height) catch return;
-        const buffer = g.getBuffer(*Self, self, draw) catch return;
-        self.surface.attach(buffer, 0, 0);
-        self.surface.damage(0, 0, width, height);
-        self.role.?.role.XdgToplevel.srfc.setWindowGeometry(0, 0, width, height);
-        self.surface.commit();
-    }
+    self.win.setGeometry(.{ .width = nw, .height = nh }) catch return;
 }
 
 fn onClose(self: *Self) void {
@@ -77,6 +65,29 @@ pub fn assignSHM(self: *Self, shm: *wl.Shm) !void {
     self.graphics = try Graphics.initSHM(self.allocator, shm, self.width, self.height);
 }
 
+pub fn resize(self: *Self, rect: rad.Rect) !void {
+    var width = self.width;
+    var height = self.height;
+    if (rect.width == self.width and rect.height == self.height) return;
+
+    if (rect.width == 0 or rect.height == 0) {} else {
+        width = rect.width;
+        height = rect.height;
+    }
+
+    self.width = width;
+    self.height = height;
+
+    if (self.graphics) |g| {
+        g.resize(width, height) catch return;
+        const buffer = g.getBuffer(*Self, self, draw) catch return;
+        self.surface.attach(buffer, 0, 0);
+        self.surface.damage(0, 0, width, height);
+        self.role.?.role.XdgToplevel.srfc.setWindowGeometry(0, 0, width, height);
+        self.surface.commit();
+    }
+}
+
 pub fn createSurface(
     allocator: std.mem.Allocator,
     compositor: *wl.Compositor,
@@ -94,7 +105,10 @@ pub fn createSurface(
         allocator.destroy(self);
     }
 
+    const geometry = win.getGeometry();
     self.* = .{
+        .width = geometry.width,
+        .height = geometry.height,
         .win = win,
         .allocator = allocator,
         .surface = surface,

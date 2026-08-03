@@ -120,6 +120,11 @@ fn destroySurface(srfc: *anyopaque) void {
     surface.deinit();
 }
 
+fn resizeSurface(srfc: *anyopaque, rect: rad.Rect) !void {
+    const surface: *Surface = @ptrCast(@alignCast(srfc));
+    try surface.resize(rect);
+}
+
 pub fn createSurface(self: *Self, win: *rad.Window) !plat.Surface {
     if (self.compositor) |comp| {
         const srfc: *anyopaque = @ptrCast(try Surface.createSurface(self.allocator, comp, win));
@@ -129,6 +134,7 @@ pub fn createSurface(self: *Self, win: *rad.Window) !plat.Surface {
             .data = srfc,
             .vtable = .{
                 .deinit = destroySurface,
+                .resize = resizeSurface,
             },
         };
     } else {

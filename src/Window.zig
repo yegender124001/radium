@@ -95,3 +95,17 @@ pub fn deinit(self: *Self) void {
     allocator.destroy(ptr);
     allocator.destroy(self);
 }
+
+pub fn setGeometry(self: *Self, rect: rad.Rect) !void {
+    const ptr: *WindowImpl = @ptrCast(@alignCast(self.impl));
+    if (ptr.srfc) |sr| {
+        try sr.resize(rect);
+    }
+    ptr.geometry = rect;
+    self.geometryChanged.emit();
+}
+
+pub fn getGeometry(self: *const Self) rad.Rect {
+    const ptr: *WindowImpl = @ptrCast(@alignCast(self.impl));
+    return ptr.geometry;
+}

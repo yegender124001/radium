@@ -32,7 +32,7 @@ pub fn addListener(
     };
 
     const listener = Listener{
-        .func = wrapper.func,
+        .func = wrapper.f,
         .data = @ptrCast(data),
     };
     try self.listeners.append(self.allocator, listener);
