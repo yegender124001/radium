@@ -4,3 +4,9 @@ wayland programs.
 
 > **Note:**
 > This project is under development and not ready yet.
+
+## TODO
+- [ ] Abstract `wl_output` to `rad.Platform.Screen`
+- [ ] Rendring
+- [ ] Input
+- [ ] Elements

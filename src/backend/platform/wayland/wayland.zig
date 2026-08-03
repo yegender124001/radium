@@ -2,6 +2,7 @@ const std = @import("std");
 const wl = @import("wayland").client.wl;
 const xdg = @import("wayland").client.xdg;
 const zxdg = @import("wayland").client.zxdg;
+const zwlr = @import("wayland").client.zwlr;
 const rad = @import("../../../root.zig");
 const Log = rad.Log;
 const Surface = @import("surface.zig");
@@ -16,6 +17,7 @@ registry: *wl.Registry,
 compositor: ?*wl.Compositor = null,
 shm: ?*wl.Shm = null,
 xdgWmBase: ?*xdg.WmBase = null,
+layerShell: ?*zwlr.LayerShellV1 = null,
 xdgDecor: ?*zxdg.DecorationManagerV1 = null,
 outputMap: ProxyMap(Output),
 surfaceMap: ProxyMap(Surface),
@@ -47,6 +49,8 @@ fn registryListener(
             } else if (std.mem.orderZ(u8, e.interface, xdg.WmBase.interface.name) == .eq) {
                 self.xdgWmBase = reg.bind(e.name, xdg.WmBase, e.version) catch return;
                 self.xdgWmBase.?.setListener(*Self, xdgWmBaseListener, self);
+            } else if (std.mem.orderZ(u8, e.interface, zwlr.LayerShellV1.interface.name) == .eq) {
+                self.layerShell = reg.bind(e.name, zwlr.LayerShellV1, e.version) catch return;
             } else if (std.mem.orderZ(u8, e.interface, zxdg.DecorationManagerV1.interface.name) == .eq) {
                 self.xdgDecor = reg.bind(e.name, zxdg.DecorationManagerV1, e.version) catch return;
             } else if (std.mem.orderZ(u8, e.interface, wl.Output.interface.name) == .eq) {
@@ -125,7 +129,6 @@ pub fn destroy(self: *Self) void {
     var iterator = self.outputMap.map.iterator();
 
     while (iterator.next()) |entry| {
-        std.log.debug("Destoryed: {}", .{entry.key_ptr.*});
         entry.value_ptr.*.deinit();
     }
     self.outputMap.deinit();
@@ -154,7 +157,6 @@ pub fn createSurface(self: *Self, win: *rad.Window) !plat.Surface {
         const srfc = try Surface.createSurface(self.allocator, comp, win, self);
         const srfc_ptr: *anyopaque = @ptrCast(srfc);
         try self.assignShm(srfc_ptr);
-        try self.assignToplevel(srfc_ptr);
         try self.surfaceMap.register(srfc.surface.getId(), srfc);
         return .{
             .data = srfc_ptr,
@@ -165,15 +167,6 @@ pub fn createSurface(self: *Self, win: *rad.Window) !plat.Surface {
         };
     } else {
         return error.NoCompositor;
-    }
-}
-
-pub fn assignToplevel(self: *Self, srfc: *anyopaque) !void {
-    const surface: *Surface = @ptrCast(@alignCast(srfc));
-    if (self.xdgWmBase) |base| {
-        return surface.assignXdgToplevel(base, self.xdgDecor);
-    } else {
-        return error.NoXDGWMBase;
     }
 }
 

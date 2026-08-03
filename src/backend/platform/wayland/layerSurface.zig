@@ -1,14 +1,11 @@
 const std = @import("std");
 const wl = @import("wayland").client.wl;
-const xdg = @import("wayland").client.xdg;
-const zxdg = @import("wayland").client.zxdg;
+const zwlr = @import("wayland").client.zwlr;
 const rad = @import("../../../root.zig");
 const Log = rad.Log;
 const Self = @This();
 
-srfc: *xdg.Surface,
-toplevel: *xdg.Toplevel,
-decor: ?*zxdg.ToplevelDecorationV1 = null,
+srfc: *zwlr.LayerSurfaceV1,
 
 allocator: std.mem.Allocator,
 
@@ -19,14 +16,13 @@ closeCallback: ?*const fn (*anyopaque) void = null,
 width: i32 = 0,
 height: i32 = 0,
 
-fn toplevelListener(
-    toplevel: *xdg.Toplevel,
-    event: xdg.Toplevel.Event,
+fn surfaceListener(
+    layerSurface: *zwlr.LayerSurfaceV1,
+    event: zwlr.LayerSurfaceV1.Event,
     self: *Self,
 ) void {
-    _ = toplevel;
     switch (event) {
-        .close => {
+        .closed => {
             if (self.closeCallback) |cb| {
                 if (self.userdata) |dat| {
                     cb(dat);
@@ -34,82 +30,51 @@ fn toplevelListener(
             }
         },
         .configure => |e| {
-            self.width = e.width;
-            self.height = e.height;
+            self.width = @intCast(e.width);
+            self.height = @intCast(e.height);
 
-            // todo: states
-        },
-        .configure_bounds => {},
-        .wm_capabilities => {},
-    }
-}
-
-fn surfaceListener(
-    srfc: *xdg.Surface,
-    event: xdg.Surface.Event,
-    self: *Self,
-) void {
-    switch (event) {
-        .configure => |e| {
-            srfc.ackConfigure(e.serial);
+            layerSurface.ackConfigure(e.serial);
 
             if (self.configureCallback) |cb| {
                 if (self.userdata) |dat| {
                     cb(dat, self.width, self.height);
                 }
             }
+
+            // todo: states
         },
     }
 }
 
-pub fn createXdgToplevel(
+pub fn createLayerSurface(
     allocator: std.mem.Allocator,
     srfc: *wl.Surface,
-    base: *xdg.WmBase,
-    decor: ?*zxdg.DecorationManagerV1,
+    layerShell: *zwlr.LayerShellV1,
 ) !*Self {
     const self = try allocator.create(Self);
     errdefer {
         allocator.destroy(self);
     }
 
-    const surface = try base.getXdgSurface(srfc);
+    const surface = try layerShell.getLayerSurface(srfc, null, .background, "null");
     errdefer {
-        Log(@src(), .Error, "Failed to get xdg_surface");
+        Log(@src(), .Error, "Failed to get layer_surface");
         surface.destroy();
         allocator.destroy(self);
-    }
-
-    const toplevel = try surface.getToplevel();
-    errdefer {
-        Log(@src(), .Error, "Failed to get xdg_toplevel");
-        toplevel.destroy();
-        surface.destroy();
-        allocator.destroy(self);
-    }
-
-    var de: *zxdg.ToplevelDecorationV1 = undefined;
-    if (decor) |d| {
-        de = try d.getToplevelDecoration(toplevel);
     }
 
     self.* = .{
-        .decor = de,
         .srfc = surface,
-        .toplevel = toplevel,
         .allocator = allocator,
     };
 
     surface.setListener(*Self, surfaceListener, self);
-    toplevel.setListener(*Self, toplevelListener, self);
     srfc.commit();
 
     return self;
 }
 
 pub fn deinit(self: *const Self) void {
-    if (self.decor) |decor| decor.destroy();
-    self.toplevel.destroy();
     self.srfc.destroy();
 
     const allocator = self.allocator;
@@ -155,5 +120,5 @@ pub fn setCloseCallback(
 }
 
 pub fn setWindowGeometry(self: *Self, rect: rad.Rect) void {
-    self.srfc.setWindowGeometry(0, 0, rect.width, rect.height);
+    self.srfc.setSize(@intCast(rect.width), @intCast(rect.height));
 }

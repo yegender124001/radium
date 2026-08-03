@@ -1,6 +1,5 @@
 pub const Surface = @import("surface.zig");
 pub const Screen = @import("screen.zig");
-pub const BackingStore = @import("backingstore.zig");
 
 ///////////////
 
@@ -25,14 +24,6 @@ pub fn createWayland(allocator: std.mem.Allocator) !Self {
     };
 }
 
-pub fn deinit(self: *const Self) void {
-    switch (self.display) {
-        .wayland => |w| {
-            w.destroy();
-        },
-    }
-}
-
 pub fn createSurface(self: *const Self, win: *rad.Window) !Surface {
     switch (self.display) {
         .wayland => |w| {
@@ -42,15 +33,14 @@ pub fn createSurface(self: *const Self, win: *rad.Window) !Surface {
     }
 }
 
-pub fn createBackingStore(self: *const Self, win: *rad.Window) !BackingStore {
-    switch (self.display) {
-        .wayland => |w| {
-            _ = w;
-            _ = win;
-        },
-    }
-}
-
 pub fn getScreens(self: *const Self) ![]Screen {
     _ = self;
+}
+
+pub fn deinit(self: *const Self) void {
+    switch (self.display) {
+        .wayland => |w| {
+            w.destroy();
+        },
+    }
 }

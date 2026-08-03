@@ -10,7 +10,7 @@ const Graphics = @import("graphics.zig");
 
 allocator: std.mem.Allocator,
 surface: *wl.Surface,
-role: ?Role = null,
+role: Role = undefined,
 graphics: ?Graphics = null,
 width: i32 = 1280,
 height: i32 = 720,
@@ -52,18 +52,6 @@ fn onClose(self: *Self) void {
     self.win.hide();
 }
 
-pub fn assignXdgToplevel(self: *Self, base: *xdg.WmBase, decor: ?*zxdg.DecorationManagerV1) !void {
-    if (self.role) |_| {
-        return error.RoleAlreadyAssigned;
-    }
-
-    self.role = try .createXdgToplevel(self.allocator, base, decor, self.surface);
-    self.role.?.setUserData(*Self, self);
-    self.role.?.setConfigureCallback(*Self, onConfigure);
-    self.role.?.setCloseCallback(*Self, onClose);
-    self.surface.commit();
-}
-
 pub fn assignSHM(self: *Self, shm: *wl.Shm) !void {
     if (self.graphics != null) return error.AlreadyHavePipeline;
     self.graphics = try Graphics.initSHM(self.allocator, shm, self.width, self.height);
@@ -88,7 +76,7 @@ pub fn resize(self: *Self, rect: rad.Rect) !void {
         const buffer = g.getBuffer(*Self, self, draw) catch return;
         self.surface.attach(buffer, 0, 0);
         self.surface.damage(0, 0, width, height);
-        self.role.?.role.XdgToplevel.srfc.setWindowGeometry(0, 0, width, height);
+        self.role.setWindowGeometry(.{ .width = width, .height = height });
         self.surface.commit();
     }
 }
@@ -105,6 +93,7 @@ pub fn createSurface(
     var surface: *wl.Surface = undefined;
 
     surface = try compositor.createSurface();
+
     errdefer {
         rad.Log(@src(), .Error, "Failed to create wl_surface");
         surface.destroy();
@@ -116,10 +105,43 @@ pub fn createSurface(
         .width = geometry.width,
         .height = geometry.height,
         .win = win,
+        .role = undefined,
         .global = global,
         .allocator = allocator,
         .surface = surface,
     };
+
+    const flags = win.getFlags();
+    switch (flags.role) {
+        .XdgToplevel => {
+            if (global.xdgWmBase) |base| {
+                self.role = try .createXdgToplevel(self.allocator, base, global.xdgDecor, surface);
+                self.role.setUserData(*Self, self);
+                self.role.setConfigureCallback(*Self, onConfigure);
+                self.role.setCloseCallback(*Self, onClose);
+                self.surface.commit();
+            } else {
+                return error.NoXDGWMBase;
+            }
+        },
+        .XdgPopup => {},
+        .LayerShell => {
+            if (global.layerShell) |shell| {
+                self.role = try .createLayerShell(self.allocator, shell, surface);
+                self.role.setUserData(*Self, self);
+                self.role.setConfigureCallback(*Self, onConfigure);
+                self.role.setCloseCallback(*Self, onClose);
+                self.role.role.LayerSurface.srfc.setLayer(.background);
+                // self.role.setWindowGeometry(.{
+                //     .width = geometry.width,
+                //     .height = geometry.height,
+                // });
+                self.surface.commit();
+            } else {
+                return error.NoLayerShell;
+            }
+        },
+    }
 
     return self;
 }
@@ -127,7 +149,7 @@ pub fn createSurface(
 pub fn deinit(self: *Self) void {
     self.global.surfaceMap.unregister(self.surface.getId());
     if (self.graphics) |graphics| graphics.deinit();
-    if (self.role) |role| role.deinit();
+    self.role.deinit();
     self.surface.destroy();
     const allocator = self.allocator;
     allocator.destroy(self);

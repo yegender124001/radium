@@ -1,14 +1,17 @@
 const wl = @import("wayland").client.wl;
 const xdg = @import("wayland").client.xdg;
 const zxdg = @import("wayland").client.zxdg;
+const zwlr = @import("wayland").client.zwlr;
 const XdgToplevel = @import("xdgtoplevel.zig");
+const rad = @import("../../../root.zig");
+const LayerSurface = @import("layerSurface.zig");
 const std = @import("std");
 
 /// Represents how a surface can be presented
 pub const Roles = union(enum) {
     XdgToplevel: *XdgToplevel,
+    LayerSurface: *LayerSurface,
     // TODO: XdgPopup
-    // TODO: LayerShell
 };
 
 role: Roles,
@@ -25,6 +28,9 @@ pub fn setConfigureCallback(
         .XdgToplevel => |x| {
             x.setConfigureCallback(T, func);
         },
+        .LayerSurface => |x| {
+            x.setConfigureCallback(T, func);
+        },
     }
 }
 
@@ -39,6 +45,9 @@ pub fn setUserData(
         .XdgToplevel => |x| {
             x.setUserData(T, ptr);
         },
+        .LayerSurface => |x| {
+            x.setUserData(T, ptr);
+        },
     }
 }
 
@@ -49,6 +58,9 @@ pub fn setCloseCallback(
 ) void {
     switch (self.role) {
         .XdgToplevel => |x| {
+            x.setCloseCallback(T, func);
+        },
+        .LayerSurface => |x| {
             x.setCloseCallback(T, func);
         },
     }
@@ -62,10 +74,32 @@ pub fn createXdgToplevel(allocator: std.mem.Allocator, base: *xdg.WmBase, decor:
     } };
 }
 
+pub fn createLayerShell(allocator: std.mem.Allocator, shell: *zwlr.LayerShellV1, surface: *wl.Surface) !Self {
+    const srfc = try LayerSurface.createLayerSurface(allocator, surface, shell);
+
+    return .{ .role = .{
+        .LayerSurface = srfc,
+    } };
+}
+
 pub fn deinit(self: *const Self) void {
     switch (self.role) {
         .XdgToplevel => |toplevel| {
             toplevel.deinit();
+        },
+        .LayerSurface => |layerShell| {
+            layerShell.deinit();
+        },
+    }
+}
+
+pub fn setWindowGeometry(self: *const Self, rect: rad.Rect) void {
+    switch (self.role) {
+        .XdgToplevel => |toplevel| {
+            toplevel.setWindowGeometry(rect);
+        },
+        .LayerSurface => |layerSurface| {
+            layerSurface.setWindowGeometry(rect);
         },
     }
 }

@@ -9,6 +9,10 @@ pub fn main(init: std.process.Init) !void {
     var win = try rad.Window.init(gpa);
     defer win.deinit();
 
+    try win.setFlags(.{
+        .role = .LayerShell,
+    });
+
     try win.show();
 
     try rad.run();

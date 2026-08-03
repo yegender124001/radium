@@ -6,10 +6,17 @@ impl: *anyopaque,
 geometryChanged: *rad.Signal,
 
 pub const Flags = struct {
-    popup: bool = false,
-    resizable: bool = true,
-    layerSurface: bool = false,
-    opengl: bool = false,
+    role: union(enum) {
+        XdgToplevel,
+        XdgPopup: struct {
+            toplevel: *rad.Window,
+        },
+        LayerShell,
+    } = .XdgToplevel,
+    backingStore: enum {
+        Raster,
+        OpenGL,
+    } = .Raster,
 };
 
 const WindowImpl = struct {
