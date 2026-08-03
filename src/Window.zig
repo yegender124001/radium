@@ -15,6 +15,7 @@ pub const Flags = struct {
 const WindowImpl = struct {
     allocator: std.mem.Allocator,
     flags: Flags = .{},
+    hidden: bool = true,
     rootElement: ?*rad.Element = null,
     geometry: rad.Rect = .{
         .x = 0,
@@ -22,7 +23,7 @@ const WindowImpl = struct {
         .width = 600,
         .height = 400,
     },
-    srfc: ?rad.Platform.Surface,
+    srfc: ?rad.Platform.Surface = null,
     app: *rad.Application,
 };
 
@@ -36,18 +37,19 @@ pub fn init(allocator: std.mem.Allocator) !*Self {
         .geometryChanged = try rad.Signal.init(allocator),
     };
     impl.* = .{
-        .srfc = null,
         .allocator = allocator,
         .app = app,
     };
 
+    try app.registerWindow(self);
     return self;
 }
 
-pub fn show(self: *const Self) !void {
+pub fn show(self: *Self) !void {
     const ptr: *WindowImpl = @ptrCast(@alignCast(self.impl));
-    if (ptr.srfc != null) {
-        ptr.srfc = try ptr.app.platform.createSurface(@constCast(self));
+    if (ptr.srfc == null) {
+        ptr.srfc = try ptr.app.platform.createSurface(self);
+        ptr.hidden = false;
     }
 }
 
@@ -56,12 +58,18 @@ pub fn hide(self: *Self) void {
     if (ptr.srfc) |srfc| {
         srfc.deinit();
         ptr.srfc = null;
+        ptr.hidden = true;
     }
 }
 
 pub fn setRootElement(self: *const Self, element: *rad.Element) void {
     const ptr: *WindowImpl = @ptrCast(@alignCast(self.impl));
     ptr.rootElement = element;
+}
+
+pub fn getHidden(self: *const Self) bool {
+    const ptr: *WindowImpl = @ptrCast(@alignCast(self.impl));
+    return ptr.hidden;
 }
 
 pub fn getRootElement(self: *const Self) ?*rad.Element {

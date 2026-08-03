@@ -6,6 +6,7 @@ var instance: ?*Self = null;
 
 allocator: std.mem.Allocator,
 platform: rad.Platform,
+windows: std.ArrayList(*rad.Window) = .empty,
 
 fn create(allocator: std.mem.Allocator) !*Self {
     if (instance) |inst| {
@@ -25,6 +26,7 @@ fn create(allocator: std.mem.Allocator) !*Self {
 
 fn deinit(self: *Self) void {
     instance = null;
+    self.windows.deinit(self.allocator);
     self.platform.deinit();
     self.allocator.destroy(self);
 }
@@ -52,8 +54,18 @@ pub fn shutdown() void {
 
 pub fn run() !void {
     if (instance) |i| {
-        while (true) {
+        while (i.windows.items.len != 0) {
             _ = i.platform.display.wayland.display.dispatch();
+
+            for (i.windows.items, 0..) |w, j| {
+                if (w.getHidden()) {
+                    _ = i.windows.swapRemove(j);
+                }
+            }
         }
     }
+}
+
+pub fn registerWindow(self: *Self, win: *rad.Window) !void {
+    try self.windows.append(self.allocator, win);
 }

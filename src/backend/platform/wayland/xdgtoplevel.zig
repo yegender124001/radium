@@ -7,6 +7,7 @@ const Self = @This();
 
 srfc: *xdg.Surface,
 toplevel: *xdg.Toplevel,
+decor: ?*zxdg.ToplevelDecorationV1 = null,
 
 allocator: std.mem.Allocator,
 
@@ -86,11 +87,13 @@ pub fn createXdgToplevel(
         allocator.destroy(self);
     }
 
+    var de: *zxdg.ToplevelDecorationV1 = undefined;
     if (decor) |d| {
-        _ = try d.getToplevelDecoration(toplevel);
+        de = try d.getToplevelDecoration(toplevel);
     }
 
     self.* = .{
+        .decor = de,
         .srfc = surface,
         .toplevel = toplevel,
         .allocator = allocator,
@@ -104,6 +107,7 @@ pub fn createXdgToplevel(
 }
 
 pub fn deinit(self: *const Self) void {
+    if (self.decor) |decor| decor.destroy();
     self.toplevel.destroy();
     self.srfc.destroy();
 

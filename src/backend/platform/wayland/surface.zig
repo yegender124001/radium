@@ -14,7 +14,6 @@ graphics: ?Graphics = null,
 width: i32 = 1280,
 height: i32 = 720,
 initialConfigured: bool = false,
-wantsClose: bool = false,
 win: *rad.Window,
 
 pub fn draw(_: *Self, _: usize) void {}
@@ -57,6 +56,7 @@ fn onConfigure(self: *Self, nw: i32, nh: i32) void {
 
             const frame = self.surface.frame() catch return;
             frame.setListener(*Self, frameListener, self);
+            self.role.?.role.XdgToplevel.srfc.setWindowGeometry(0, 0, width, height);
             self.surface.commit();
             self.initialConfigured = true;
         }
@@ -64,7 +64,7 @@ fn onConfigure(self: *Self, nw: i32, nh: i32) void {
 }
 
 fn onClose(self: *Self) void {
-    self.wantsClose = true;
+    self.win.hide();
 }
 
 pub fn assignXdgToplevel(self: *Self, base: *xdg.WmBase, decor: ?*zxdg.DecorationManagerV1) !void {
