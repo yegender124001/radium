@@ -10,3 +10,6 @@ wayland programs.
 - [ ] Rendring
 - [ ] Input
 - [ ] Elements
+
+## Known Bugs
+  - Can't resize the layer shell window after win.show()

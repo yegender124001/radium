@@ -18,7 +18,10 @@ win: *rad.Window,
 global: *Global,
 initConfigured: bool = false,
 
-pub fn draw(_: *Self, _: usize) void {}
+pub fn draw(self: *Self, addr: usize) void {
+    const pixl: [*]u32 = @ptrFromInt(addr);
+    @memset(pixl[0..@intCast(self.width * self.height)], 0xFF222222);
+}
 
 fn frameListener(cb: *wl.Callback, event: wl.Callback.Event, self: *Self) void {
     switch (event) {
@@ -69,16 +72,17 @@ pub fn resize(self: *Self, rect: rad.Rect) !void {
 
     self.width = width;
     self.height = height;
-
-    if (!self.initConfigured) return;
     if (self.graphics) |g| {
-        g.resize(width, height) catch return;
-        const buffer = g.getBuffer(*Self, self, draw) catch return;
-        self.surface.attach(buffer, 0, 0);
-        self.surface.damage(0, 0, width, height);
-        self.role.setWindowGeometry(.{ .width = width, .height = height });
-        self.surface.commit();
+        if (self.initConfigured) {
+            g.resize(width, height) catch return;
+            const buffer = g.getBuffer(*Self, self, draw) catch return;
+            self.surface.attach(buffer, 0, 0);
+            self.surface.damage(0, 0, width, height);
+        }
     }
+    if (!(self.role.role == .LayerSurface))
+        self.role.setWindowGeometry(.{ .width = width, .height = height });
+    self.surface.commit();
 }
 
 pub fn createSurface(
@@ -131,11 +135,11 @@ pub fn createSurface(
                 self.role.setUserData(*Self, self);
                 self.role.setConfigureCallback(*Self, onConfigure);
                 self.role.setCloseCallback(*Self, onClose);
-                self.role.role.LayerSurface.srfc.setLayer(.background);
-                // self.role.setWindowGeometry(.{
-                //     .width = geometry.width,
-                //     .height = geometry.height,
-                // });
+                self.role.role.LayerSurface.srfc.setLayer(.bottom);
+                self.role.setWindowGeometry(.{
+                    .width = geometry.width,
+                    .height = geometry.height,
+                });
                 self.surface.commit();
             } else {
                 return error.NoLayerShell;
