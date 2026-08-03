@@ -15,6 +15,8 @@ width: i32 = 1280,
 height: i32 = 720,
 win: *rad.Window,
 
+initConfigured: bool = false,
+
 pub fn draw(_: *Self, _: usize) void {}
 
 fn frameListener(cb: *wl.Callback, event: wl.Callback.Event, self: *Self) void {
@@ -34,6 +36,7 @@ fn frameListener(cb: *wl.Callback, event: wl.Callback.Event, self: *Self) void {
 }
 
 fn onConfigure(self: *Self, nw: i32, nh: i32) void {
+    self.initConfigured = true;
     self.resize(.{
         .x = 0,
         .y = 0,
@@ -78,6 +81,7 @@ pub fn resize(self: *Self, rect: rad.Rect) !void {
     self.width = width;
     self.height = height;
 
+    if (!self.initConfigured) return;
     if (self.graphics) |g| {
         g.resize(width, height) catch return;
         const buffer = g.getBuffer(*Self, self, draw) catch return;
