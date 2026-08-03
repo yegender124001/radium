@@ -6,7 +6,9 @@ const rad = @import("../../../root.zig");
 const Log = rad.Log;
 const Surface = @import("surface.zig");
 const plat = @import("../platform.zig");
+const ProxyMap = @import("proxymap.zig").ProxyMap;
 const Self = @This();
+const Output = @import("output.zig");
 
 allocator: std.mem.Allocator,
 display: *wl.Display,
@@ -15,6 +17,8 @@ compositor: ?*wl.Compositor = null,
 shm: ?*wl.Shm = null,
 xdgWmBase: ?*xdg.WmBase = null,
 xdgDecor: ?*zxdg.DecorationManagerV1 = null,
+outputMap: ProxyMap(Output),
+surfaceMap: ProxyMap(Surface),
 
 fn xdgWmBaseListener(
     wmBase: *xdg.WmBase,
@@ -45,9 +49,18 @@ fn registryListener(
                 self.xdgWmBase.?.setListener(*Self, xdgWmBaseListener, self);
             } else if (std.mem.orderZ(u8, e.interface, zxdg.DecorationManagerV1.interface.name) == .eq) {
                 self.xdgDecor = reg.bind(e.name, zxdg.DecorationManagerV1, e.version) catch return;
+            } else if (std.mem.orderZ(u8, e.interface, wl.Output.interface.name) == .eq) {
+                const output = reg.bind(e.name, wl.Output, e.version) catch return;
+                const pout = Output.init(self.allocator, output) catch return;
+                self.outputMap.register(e.name, pout) catch return;
             }
         },
-        .global_remove => {},
+        .global_remove => |e| {
+            if (self.outputMap.map.get(e.name)) |pout| {
+                pout.deinit();
+                _ = self.outputMap.map.remove(e.name);
+            }
+        },
     }
 }
 
@@ -76,6 +89,8 @@ pub fn create(allocator: std.mem.Allocator) !*Self {
         .allocator = allocator,
         .display = display,
         .registry = registry,
+        .outputMap = .init(allocator),
+        .surfaceMap = .init(allocator),
     };
 
     registry.setListener(*Self, registryListener, self);
@@ -107,6 +122,15 @@ pub fn destroy(self: *Self) void {
 
     if (self.compositor) |comp| comp.destroy();
 
+    var iterator = self.outputMap.map.iterator();
+
+    while (iterator.next()) |entry| {
+        std.log.debug("Destoryed: {}", .{entry.key_ptr.*});
+        entry.value_ptr.*.deinit();
+    }
+    self.outputMap.deinit();
+    self.surfaceMap.deinit();
+
     self.registry.destroy();
 
     self.display.disconnect();
@@ -127,11 +151,13 @@ fn resizeSurface(srfc: *anyopaque, rect: rad.Rect) !void {
 
 pub fn createSurface(self: *Self, win: *rad.Window) !plat.Surface {
     if (self.compositor) |comp| {
-        const srfc: *anyopaque = @ptrCast(try Surface.createSurface(self.allocator, comp, win));
-        try self.assignShm(srfc);
-        try self.assignToplevel(srfc);
+        const srfc = try Surface.createSurface(self.allocator, comp, win, self);
+        const srfc_ptr: *anyopaque = @ptrCast(srfc);
+        try self.assignShm(srfc_ptr);
+        try self.assignToplevel(srfc_ptr);
+        try self.surfaceMap.register(srfc.surface.getId(), srfc);
         return .{
-            .data = srfc,
+            .data = srfc_ptr,
             .vtable = .{
                 .deinit = destroySurface,
                 .resize = resizeSurface,

@@ -2,6 +2,7 @@ const Self = @This();
 const std = @import("std");
 const xdg = @import("wayland").client.xdg;
 const zxdg = @import("wayland").client.zxdg;
+const Global = @import("wayland.zig");
 const wl = @import("wayland").client.wl;
 const rad = @import("../../../root.zig");
 const Role = @import("role.zig");
@@ -14,7 +15,7 @@ graphics: ?Graphics = null,
 width: i32 = 1280,
 height: i32 = 720,
 win: *rad.Window,
-
+global: *Global,
 initConfigured: bool = false,
 
 pub fn draw(_: *Self, _: usize) void {}
@@ -96,6 +97,7 @@ pub fn createSurface(
     allocator: std.mem.Allocator,
     compositor: *wl.Compositor,
     win: *rad.Window,
+    global: *Global,
 ) !*Self {
     const self = try allocator.create(Self);
     errdefer allocator.destroy(self);
@@ -114,6 +116,7 @@ pub fn createSurface(
         .width = geometry.width,
         .height = geometry.height,
         .win = win,
+        .global = global,
         .allocator = allocator,
         .surface = surface,
     };
@@ -122,6 +125,7 @@ pub fn createSurface(
 }
 
 pub fn deinit(self: *Self) void {
+    self.global.surfaceMap.unregister(self.surface.getId());
     if (self.graphics) |graphics| graphics.deinit();
     if (self.role) |role| role.deinit();
     self.surface.destroy();

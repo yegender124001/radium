@@ -1,6 +1,6 @@
 pub const Surface = @import("surface.zig");
 pub const Screen = @import("screen.zig");
-pub const BackingStorer = @import("backingstore.zig");
+pub const BackingStore = @import("backingstore.zig");
 
 ///////////////
 
@@ -40,4 +40,17 @@ pub fn createSurface(self: *const Self, win: *rad.Window) !Surface {
             return srfc;
         },
     }
+}
+
+pub fn createBackingStore(self: *const Self, win: *rad.Window) !BackingStore {
+    switch (self.display) {
+        .wayland => |w| {
+            _ = w;
+            _ = win;
+        },
+    }
+}
+
+pub fn getScreens(self: *const Self) ![]Screen {
+    _ = self;
 }
