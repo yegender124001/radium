@@ -13,7 +13,6 @@ role: ?Role = null,
 graphics: ?Graphics = null,
 width: i32 = 1280,
 height: i32 = 720,
-initialConfigured: bool = false,
 win: *rad.Window,
 
 pub fn draw(_: *Self, _: usize) void {}
@@ -49,17 +48,11 @@ fn onConfigure(self: *Self, nw: i32, nh: i32) void {
 
     if (self.graphics) |g| {
         g.resize(width, height) catch return;
-        if (!self.initialConfigured) {
-            const buffer = g.getBuffer(*Self, self, draw) catch return;
-            self.surface.attach(buffer, 0, 0);
-            self.surface.damage(0, 0, width, height);
-
-            const frame = self.surface.frame() catch return;
-            frame.setListener(*Self, frameListener, self);
-            self.role.?.role.XdgToplevel.srfc.setWindowGeometry(0, 0, width, height);
-            self.surface.commit();
-            self.initialConfigured = true;
-        }
+        const buffer = g.getBuffer(*Self, self, draw) catch return;
+        self.surface.attach(buffer, 0, 0);
+        self.surface.damage(0, 0, width, height);
+        self.role.?.role.XdgToplevel.srfc.setWindowGeometry(0, 0, width, height);
+        self.surface.commit();
     }
 }
 
