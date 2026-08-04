@@ -17,8 +17,11 @@ height: i32 = 720,
 win: *rad.Window,
 global: *Global,
 initConfigured: bool = false,
+resizeLock: bool = false,
 
 pub fn draw(self: *Self, addr: usize) void {
+    // _ = self;
+    // _ = addr;
     const pixl: [*]u32 = @ptrFromInt(addr);
     @memset(pixl[0..@intCast(self.width * self.height)], 0xFF222222);
 }
@@ -41,14 +44,10 @@ fn frameListener(cb: *wl.Callback, event: wl.Callback.Event, self: *Self) void {
 
 fn onConfigure(self: *Self, nw: i32, nh: i32) void {
     self.initConfigured = true;
-    self.resize(.{
-        .x = 0,
-        .y = 0,
-        .width = nw,
-        .height = nh,
-    }) catch return;
-
+    if (self.resizeLock and self.role.role == .LayerSurface) return;
+    self.resizeLock = true;
     self.win.setGeometry(.{ .width = nw, .height = nh }) catch return;
+    self.resizeLock = false;
 }
 
 fn onClose(self: *Self) void {
@@ -72,6 +71,9 @@ pub fn resize(self: *Self, rect: rad.Rect) !void {
 
     self.width = width;
     self.height = height;
+
+    if (self.resizeLock != true or self.role.role != .LayerSurface)
+        self.role.setWindowGeometry(.{ .width = width, .height = height });
     if (self.graphics) |g| {
         if (self.initConfigured) {
             g.resize(width, height) catch return;
@@ -80,8 +82,7 @@ pub fn resize(self: *Self, rect: rad.Rect) !void {
             self.surface.damage(0, 0, width, height);
         }
     }
-    if (!(self.role.role == .LayerSurface))
-        self.role.setWindowGeometry(.{ .width = width, .height = height });
+
     self.surface.commit();
 }
 
@@ -136,10 +137,7 @@ pub fn createSurface(
                 self.role.setConfigureCallback(*Self, onConfigure);
                 self.role.setCloseCallback(*Self, onClose);
                 self.role.role.LayerSurface.srfc.setLayer(.bottom);
-                self.role.setWindowGeometry(.{
-                    .width = geometry.width,
-                    .height = geometry.height,
-                });
+                self.role.role.LayerSurface.srfc.setSize(@intCast(geometry.width), @intCast(geometry.height));
                 self.surface.commit();
             } else {
                 return error.NoLayerShell;

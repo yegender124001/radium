@@ -15,10 +15,15 @@ addr: usize,
 pub fn create(
     allocator: std.mem.Allocator,
     shm: *wl.Shm,
-    width: i32,
-    height: i32,
+    w: i32,
+    h: i32,
 ) !*Self {
-    if (width == 0 or height == 0) return error.ZeroSize;
+    var width: i32 = 100;
+    var height: i32 = 100;
+    if (w != 0 and h != 0) {
+        width = w;
+        height = h;
+    }
 
     const self = try allocator.create(Self);
     errdefer {

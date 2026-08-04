@@ -10,11 +10,11 @@ pub fn main(init: std.process.Init) !void {
     defer win.deinit();
 
     try win.setFlags(.{
-        // .role = .LayerShell,
+        .role = .LayerShell,
     });
 
-    try win.setGeometry(.{ .width = 400, .height = 600 });
     try win.show();
+    try win.setGeometry(.{ .width = 0, .height = 0 });
 
     try rad.run();
 }
