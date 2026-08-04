@@ -19,9 +19,21 @@ global: *Global,
 initConfigured: bool = false,
 resizeLock: bool = false,
 
+fn surfaceListener(_: *wl.Surface, event: wl.Surface.Event, self: *Self) void {
+    switch (event) {
+        .enter => |e| {
+            if (e.output) |output| {
+                _ = output;
+                _ = self;
+            }
+        },
+        .leave => {},
+        .preferred_buffer_scale => {},
+        .preferred_buffer_transform => {},
+    }
+}
+
 pub fn draw(self: *Self, addr: usize) void {
-    // _ = self;
-    // _ = addr;
     const pixl: [*]u32 = @ptrFromInt(addr);
     @memset(pixl[0..@intCast(self.width * self.height)], 0xFF222222);
 }
@@ -96,7 +108,6 @@ pub fn createSurface(
     errdefer allocator.destroy(self);
 
     var surface: *wl.Surface = undefined;
-
     surface = try compositor.createSurface();
 
     errdefer {
@@ -115,6 +126,8 @@ pub fn createSurface(
         .allocator = allocator,
         .surface = surface,
     };
+
+    surface.setListener(*Self, surfaceListener, self);
 
     const flags = win.getFlags();
     switch (flags.role) {
@@ -149,7 +162,7 @@ pub fn createSurface(
 }
 
 pub fn deinit(self: *Self) void {
-    self.global.surfaceMap.unregister(self.surface.getId());
+    self.global.surfaceMap.unregister(self.surface);
     if (self.graphics) |graphics| graphics.deinit();
     self.role.deinit();
     self.surface.destroy();

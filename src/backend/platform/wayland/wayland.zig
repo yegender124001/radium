@@ -7,7 +7,7 @@ const rad = @import("../../../root.zig");
 const Log = rad.Log;
 const Surface = @import("surface.zig");
 const plat = @import("../platform.zig");
-const ProxyMap = @import("proxymap.zig").ProxyMap;
+const ProxyMap = rad.ProxyMap;
 const Self = @This();
 const Output = @import("output.zig");
 
@@ -56,13 +56,16 @@ fn registryListener(
             } else if (std.mem.orderZ(u8, e.interface, wl.Output.interface.name) == .eq) {
                 const output = reg.bind(e.name, wl.Output, e.version) catch return;
                 const pout = Output.init(self.allocator, output) catch return;
-                self.outputMap.register(e.name, pout) catch return;
+                pout.eventName = e.name;
+                self.outputMap.register(output, pout) catch return;
             }
         },
         .global_remove => |e| {
-            if (self.outputMap.map.get(e.name)) |pout| {
-                pout.deinit();
-                _ = self.outputMap.map.remove(e.name);
+            var outputIterator = self.outputMap.map.valueIterator();
+            while (outputIterator.next()) |out| {
+                if (out.*.eventName == e.name) {
+                    out.*.deinit();
+                }
             }
         },
     }
@@ -157,7 +160,7 @@ pub fn createSurface(self: *Self, win: *rad.Window) !plat.Surface {
         const srfc = try Surface.createSurface(self.allocator, comp, win, self);
         const srfc_ptr: *anyopaque = @ptrCast(srfc);
         try self.assignShm(srfc_ptr);
-        try self.surfaceMap.register(srfc.surface.getId(), srfc);
+        try self.surfaceMap.register(srfc.surface, srfc);
         return .{
             .data = srfc_ptr,
             .vtable = .{

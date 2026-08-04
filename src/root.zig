@@ -7,6 +7,7 @@ pub const Types = @import("misc/Types.zig");
 pub const Rect = Types.Rect;
 pub const Signal = @import("misc/Signal.zig");
 pub const Window = @import("Window.zig");
+pub const ProxyMap = @import("misc/proxymap.zig").ProxyMap;
 
 pub const Application = @import("Application.zig");
 // Helper functions

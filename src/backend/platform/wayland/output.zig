@@ -21,6 +21,8 @@ scale_factor: i32 = 0,
 name: [*:0]const u8 = "",
 description: [*:0]const u8 = "",
 
+eventName: u32 = 0,
+
 const Self = @This();
 
 fn outputListener(_: *wl.Output, event: wl.Output.Event, self: *Self) void {

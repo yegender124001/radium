@@ -15,12 +15,12 @@ pub fn ProxyMap(comptime Wrapper: type) type {
             self.map.deinit();
         }
 
-        pub fn register(self: *Self, id: usize, wrapper: *Wrapper) !void {
-            try self.map.put(id, wrapper);
+        pub fn register(self: *Self, proxy: anytype, wrapper: *Wrapper) !void {
+            try self.map.put(@intFromPtr(proxy), wrapper);
         }
 
-        pub fn unregister(self: *Self, id: usize) void {
-            _ = self.map.remove(id);
+        pub fn unregister(self: *Self, proxy: anytype) void {
+            _ = self.map.remove(@intFromPtr(proxy));
         }
     };
 }
