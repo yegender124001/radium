@@ -3,7 +3,8 @@ const rad = @import("radium");
 
 pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
-    try rad.init(gpa);
+    const io = init.io;
+    try rad.init(gpa, io);
     defer rad.shutdown();
 
     var win = try rad.Window.init(gpa);

@@ -8,13 +8,13 @@ const LayerSurface = @import("layerSurface.zig");
 const std = @import("std");
 
 /// Represents how a surface can be presented
-pub const Roles = union(enum) {
+pub const Kind = union(enum) {
     XdgToplevel: *XdgToplevel,
     LayerSurface: *LayerSurface,
     // TODO: XdgPopup
 };
 
-role: Roles,
+kind: Kind,
 
 const Self = @This();
 
@@ -24,7 +24,7 @@ pub fn setConfigureCallback(
     comptime T: type,
     comptime func: *const fn (T, i32, i32) void,
 ) void {
-    switch (self.role) {
+    switch (self.kind) {
         .XdgToplevel => |x| {
             x.setConfigureCallback(T, func);
         },
@@ -41,7 +41,7 @@ pub fn setUserData(
     comptime T: type,
     ptr: T,
 ) void {
-    switch (self.role) {
+    switch (self.kind) {
         .XdgToplevel => |x| {
             x.setUserData(T, ptr);
         },
@@ -56,7 +56,7 @@ pub fn setCloseCallback(
     comptime T: type,
     comptime func: *const fn (T) void,
 ) void {
-    switch (self.role) {
+    switch (self.kind) {
         .XdgToplevel => |x| {
             x.setCloseCallback(T, func);
         },
@@ -69,7 +69,7 @@ pub fn setCloseCallback(
 pub fn createXdgToplevel(allocator: std.mem.Allocator, base: *xdg.WmBase, decor: ?*zxdg.DecorationManagerV1, surface: *wl.Surface) !Self {
     const toplevel = try XdgToplevel.createXdgToplevel(allocator, surface, base, decor);
 
-    return .{ .role = .{
+    return .{ .kind = .{
         .XdgToplevel = toplevel,
     } };
 }
@@ -77,13 +77,13 @@ pub fn createXdgToplevel(allocator: std.mem.Allocator, base: *xdg.WmBase, decor:
 pub fn createLayerShell(allocator: std.mem.Allocator, shell: *zwlr.LayerShellV1, surface: *wl.Surface) !Self {
     const srfc = try LayerSurface.createLayerSurface(allocator, surface, shell);
 
-    return .{ .role = .{
+    return .{ .kind = .{
         .LayerSurface = srfc,
     } };
 }
 
 pub fn deinit(self: *const Self) void {
-    switch (self.role) {
+    switch (self.kind) {
         .XdgToplevel => |toplevel| {
             toplevel.deinit();
         },
@@ -94,7 +94,7 @@ pub fn deinit(self: *const Self) void {
 }
 
 pub fn setWindowGeometry(self: *const Self, rect: rad.Rect) void {
-    switch (self.role) {
+    switch (self.kind) {
         .XdgToplevel => |toplevel| {
             toplevel.setWindowGeometry(rect);
         },

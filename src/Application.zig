@@ -7,8 +7,9 @@ var instance: ?*Self = null;
 allocator: std.mem.Allocator,
 platform: rad.Platform,
 windows: std.ArrayList(*rad.Window) = .empty,
+io: std.Io,
 
-fn create(allocator: std.mem.Allocator) !*Self {
+fn create(allocator: std.mem.Allocator, io: std.Io) !*Self {
     if (instance) |inst| {
         return inst;
     }
@@ -19,6 +20,7 @@ fn create(allocator: std.mem.Allocator) !*Self {
     self.* = .{
         .allocator = allocator,
         .platform = platform,
+        .io = io,
     };
     instance = self;
     return self;
@@ -39,11 +41,11 @@ pub fn getInstance() !*Self {
     }
 }
 
-pub fn init(allocator: std.mem.Allocator) !void {
+pub fn init(allocator: std.mem.Allocator, io: std.Io) !void {
     if (instance) |_| {
         return error.InstanceAlreadyCreated;
     }
-    instance = try create(allocator);
+    instance = try create(allocator, io);
 }
 
 pub fn shutdown() void {

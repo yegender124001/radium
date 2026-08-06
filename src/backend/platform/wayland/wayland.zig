@@ -2,12 +2,14 @@ const std = @import("std");
 const wl = @import("wayland").client.wl;
 const xdg = @import("wayland").client.xdg;
 const zxdg = @import("wayland").client.zxdg;
+const zwp = @import("wayland").client.zwp;
 const zwlr = @import("wayland").client.zwlr;
 const rad = @import("../../../root.zig");
 const Log = rad.Log;
 const Surface = @import("surface.zig");
 const plat = @import("../platform.zig");
 const ProxyMap = rad.ProxyMap;
+const c = @import("c.zig").c;
 const Self = @This();
 const Output = @import("output.zig");
 
@@ -16,6 +18,7 @@ display: *wl.Display,
 registry: *wl.Registry,
 compositor: ?*wl.Compositor = null,
 shm: ?*wl.Shm = null,
+dmaBuf: ?*zwp.LinuxDmabufV1 = null,
 xdgWmBase: ?*xdg.WmBase = null,
 layerShell: ?*zwlr.LayerShellV1 = null,
 xdgDecor: ?*zxdg.DecorationManagerV1 = null,
@@ -46,6 +49,8 @@ fn registryListener(
                 self.compositor = reg.bind(e.name, wl.Compositor, e.version) catch return;
             } else if (std.mem.orderZ(u8, e.interface, wl.Shm.interface.name) == .eq) {
                 self.shm = reg.bind(e.name, wl.Shm, e.version) catch return;
+            } else if (std.mem.orderZ(u8, e.interface, zwp.LinuxDmabufV1.interface.name) == .eq) {
+                self.dmaBuf = reg.bind(e.name, zwp.LinuxDmabufV1, e.version) catch return;
             } else if (std.mem.orderZ(u8, e.interface, xdg.WmBase.interface.name) == .eq) {
                 self.xdgWmBase = reg.bind(e.name, xdg.WmBase, e.version) catch return;
                 self.xdgWmBase.?.setListener(*Self, xdgWmBaseListener, self);
@@ -159,7 +164,6 @@ pub fn createSurface(self: *Self, win: *rad.Window) !plat.Surface {
     if (self.compositor) |comp| {
         const srfc = try Surface.createSurface(self.allocator, comp, win, self);
         const srfc_ptr: *anyopaque = @ptrCast(srfc);
-        try self.assignShm(srfc_ptr);
         try self.surfaceMap.register(srfc.surface, srfc);
         return .{
             .data = srfc_ptr,
@@ -170,15 +174,6 @@ pub fn createSurface(self: *Self, win: *rad.Window) !plat.Surface {
         };
     } else {
         return error.NoCompositor;
-    }
-}
-
-pub fn assignShm(self: *Self, srfc: *anyopaque) !void {
-    const surface: *Surface = @ptrCast(@alignCast(srfc));
-    if (self.shm) |shm| {
-        return surface.assignSHM(shm);
-    } else {
-        return error.NoShm;
     }
 }
 

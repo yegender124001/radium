@@ -15,7 +15,6 @@ pub const Flags = struct {
     } = .XdgToplevel,
     backingStore: enum {
         Raster,
-        OpenGL,
     } = .Raster,
 };
 
