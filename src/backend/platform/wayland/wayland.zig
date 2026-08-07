@@ -9,7 +9,6 @@ const Log = rad.Log;
 const Surface = @import("surface.zig");
 const plat = @import("../platform.zig");
 const ProxyMap = rad.ProxyMap;
-const c = @import("c.zig").c;
 const Self = @This();
 const Output = @import("output.zig");
 
