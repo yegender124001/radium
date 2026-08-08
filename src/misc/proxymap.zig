@@ -22,5 +22,9 @@ pub fn ProxyMap(comptime Wrapper: type) type {
         pub fn unregister(self: *Self, proxy: anytype) void {
             _ = self.map.remove(@intFromPtr(proxy));
         }
+
+        pub fn get(self: *Self, proxy: anytype) ?*Wrapper {
+            return self.map.get(@intFromPtr(proxy));
+        }
     };
 }

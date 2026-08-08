@@ -1,73 +1,57 @@
-const Self = @This();
+const Application = @This();
+
 const std = @import("std");
 const rad = @import("root.zig");
 
-var instance: ?*Self = null;
+var instance: ?*Application = null;
 
-allocator: std.mem.Allocator,
 platform: rad.Platform,
-windows: std.ArrayList(*rad.Window) = .empty,
-io: std.Io,
+allocator: std.mem.Allocator,
 
-fn create(allocator: std.mem.Allocator, io: std.Io) !*Self {
-    if (instance) |inst| {
-        return inst;
-    }
-
-    const self = try allocator.create(Self);
-
-    const platform = try rad.Platform.createWayland(allocator);
-    self.* = .{
-        .allocator = allocator,
-        .platform = platform,
-        .io = io,
-    };
-    instance = self;
-    return self;
-}
-
-fn deinit(self: *Self) void {
-    instance = null;
-    self.windows.deinit(self.allocator);
-    self.platform.deinit();
-    self.allocator.destroy(self);
-}
-
-pub fn getInstance() !*Self {
-    if (instance) |inst| {
-        return inst;
-    } else {
-        return error.InstanceNotCreated;
-    }
-}
-
-pub fn init(allocator: std.mem.Allocator, io: std.Io) !void {
+pub fn init(allocator: std.mem.Allocator) !void {
     if (instance) |_| {
-        return error.InstanceAlreadyCreated;
+        return;
     }
-    instance = try create(allocator, io);
+
+    instance = try allocator.create(Application);
+
+    try instance.?.createInstance(allocator);
 }
 
-pub fn shutdown() void {
+fn createInstance(self: *Application, allocator: std.mem.Allocator) !void {
+    std.log.debug("Instance Created", .{});
+
+    self.platform = undefined;
+    std.log.debug("Initializing Platform", .{});
+    try self.platform.initWayland(allocator);
+}
+
+fn deinit(self: *Application) void {
+    std.log.debug("Instance Destroyed", .{});
+    self.platform.deinit();
+}
+
+pub fn shutdown(allocator: std.mem.Allocator) void {
     if (instance) |inst| {
         inst.deinit();
+        allocator.destroy(inst);
+        instance = null;
     }
 }
 
 pub fn run() !void {
-    if (instance) |i| {
-        while (i.windows.items.len != 0) {
-            _ = i.platform.display.wayland.display.dispatch();
-
-            for (i.windows.items, 0..) |w, j| {
-                if (w.getHidden()) {
-                    _ = i.windows.swapRemove(j);
-                }
-            }
-        }
+    if (instance) |inst| {
+        while (inst.platform.backend.Wayland.surfaces.map.count() != 0)
+            inst.platform.dispatch();
+    } else {
+        return error.NoInstance;
     }
 }
 
-pub fn registerWindow(self: *Self, win: *rad.Window) !void {
-    try self.windows.append(self.allocator, win);
+pub fn getInstance() !*Application {
+    if (instance) |inst| {
+        return inst;
+    } else {
+        return error.NoInstance;
+    }
 }

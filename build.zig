@@ -55,6 +55,12 @@ pub fn build(b: *std.Build) void {
         .target = target,
     });
 
+    const xkbcommon = b.dependency("xkbcommon", .{});
+    mod.addImport("xkbcommon", xkbcommon.module("xkbcommon"));
+
+    const pixman = b.dependency("pixman", .{});
+    mod.addImport("pixman", pixman.module("pixman"));
+
     mod.addSystemIncludePath(.{ .cwd_relative = "/usr/include/cairo/" });
     mod.addSystemIncludePath(.{ .cwd_relative = "/usr/include/freetype2/" });
     mod.addSystemIncludePath(.{ .cwd_relative = "/usr/include/pixman-1/" });
@@ -66,6 +72,7 @@ pub fn build(b: *std.Build) void {
     mod.linkSystemLibrary("freetype2", .{});
     mod.linkSystemLibrary("pixman-1", .{});
     mod.linkSystemLibrary("png16", .{});
+    mod.linkSystemLibrary("xkbcommon", .{});
 
     const mod_test = b.addTest(.{
         .root_module = mod,

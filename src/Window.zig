@@ -1,117 +1,100 @@
 const std = @import("std");
+
 const rad = @import("root.zig");
-const Self = @This();
+const App = rad.Application;
 
-impl: *anyopaque,
-geometryChanged: *rad.Signal,
+const Window = @This();
 
-pub const Flags = struct {
-    role: union(enum) {
-        XdgToplevel,
-        XdgPopup: struct {
-            toplevel: *rad.Window,
+const DEFAULT_WIDTH = 600;
+const DEFAULT_HEIGHT = 400;
+const DEFAULT_TITLE = "Radium"; // A string library with translations
+
+app: *App,
+platformWindow: ?rad.Platform.Window,
+allocator: std.mem.Allocator,
+width: u32 = DEFAULT_WIDTH,
+height: u32 = DEFAULT_HEIGHT,
+maximized: bool = false,
+minimized: bool = false,
+frameless: bool = false,
+title: [*:0]const u8 = DEFAULT_TITLE,
+pHandleEvents: *const fn (*Window, Events) void = handleEvents,
+
+pub const Events = union(enum) {
+    Close,
+    MouseMotion: struct { x: i32, y: i32 },
+};
+
+fn handleEvents(self: *Window, event: Events) void {
+    switch (event) {
+        .Close => {
+            self.hide();
         },
-        LayerShell,
-    } = .XdgToplevel,
-    backingStore: enum {
-        Raster,
-    } = .Raster,
-};
+        .MouseMotion => {},
+    }
+}
 
-const WindowImpl = struct {
-    allocator: std.mem.Allocator,
-    flags: Flags = .{},
-    hidden: bool = true,
-    rootElement: ?*rad.Element = null,
-    geometry: rad.Rect = .{
-        .x = 0,
-        .y = 0,
-        .width = 600,
-        .height = 400,
-    },
-    srfc: ?rad.Platform.Surface = null,
-    app: *rad.Application,
-};
-
-pub fn init(allocator: std.mem.Allocator) !*Self {
-    const self = try allocator.create(Self);
-    const impl = try allocator.create(WindowImpl);
-    const app = try rad.Application.getInstance();
-
+pub fn init(self: *Window, allocator: std.mem.Allocator) !void {
+    std.log.debug("Create Window at {}", .{@intFromPtr(self)});
     self.* = .{
-        .impl = @ptrCast(impl),
-        .geometryChanged = try rad.Signal.init(allocator),
-    };
-    impl.* = .{
+        .app = try rad.getInstance(),
+        .platformWindow = null,
         .allocator = allocator,
-        .app = app,
     };
-
-    try app.registerWindow(self);
-    return self;
 }
 
-pub fn show(self: *Self) !void {
-    const ptr: *WindowImpl = @ptrCast(@alignCast(self.impl));
-    if (ptr.srfc == null) {
-        ptr.srfc = try ptr.app.platform.createSurface(self);
-        ptr.hidden = false;
+pub fn setWidth(self: *Window, width: u32) !void {
+    self.width = width;
+    if (self.platformWindow) |*win| {
+        try win.setWidth(width);
     }
 }
 
-pub fn hide(self: *Self) void {
-    const ptr: *WindowImpl = @ptrCast(@alignCast(self.impl));
-    if (ptr.srfc) |srfc| {
-        srfc.deinit();
-        ptr.srfc = null;
-        ptr.hidden = true;
+pub fn setHeight(self: *Window, height: u32) !void {
+    self.height = height;
+    if (self.platformWindow) |*win| {
+        try win.setHeight(height);
     }
 }
 
-pub fn setRootElement(self: *const Self, element: *rad.Element) void {
-    const ptr: *WindowImpl = @ptrCast(@alignCast(self.impl));
-    ptr.rootElement = element;
+pub fn setMaximized(self: *Window, s: bool) !void {
+    self.maximized = s;
+    if (self.platformWindow) |*win| {
+        try win.setMaximized(s);
+    }
 }
 
-pub fn getHidden(self: *const Self) bool {
-    const ptr: *WindowImpl = @ptrCast(@alignCast(self.impl));
-    return ptr.hidden;
+pub fn setMinimized(self: *Window, s: bool) !void {
+    self.minimized = s;
+    if (self.platformWindow) |*win| {
+        try win.minimize();
+    }
 }
 
-pub fn getRootElement(self: *const Self) ?*rad.Element {
-    const ptr: *WindowImpl = @ptrCast(@alignCast(self.impl));
-    return ptr.rootElement;
+pub fn setTitle(self: *Window, title: [*:0]const u8) void {
+    self.title = title;
+    if (self.platformWindow) |*win| {
+        win.setTitle(title);
+    }
 }
 
-pub fn setFlags(self: *const Self, f: Flags) !void {
-    const ptr: *WindowImpl = @ptrCast(@alignCast(self.impl));
-    ptr.flags = f;
+pub fn show(self: *Window) !void {
+    if (self.platformWindow == null) {
+        std.log.debug("Platform window Initialized for window {}", .{@intFromPtr(self)});
+        self.platformWindow = undefined;
+        try self.app.platform.createWindow(self.allocator, self, &self.platformWindow.?);
+    }
 }
 
-pub fn getFlags(self: *const Self) Flags {
-    const ptr: *WindowImpl = @ptrCast(@alignCast(self.impl));
-    return ptr.flags;
+pub fn hide(self: *Window) void {
+    if (self.platformWindow) |*win| {
+        std.log.debug("Platform window deinitialized for window {}", .{@intFromPtr(self)});
+        win.deinit(self.allocator);
+        self.platformWindow = null;
+    }
 }
 
-pub fn deinit(self: *Self) void {
-    self.geometryChanged.deinit();
+pub fn deinit(self: *Window) void {
     self.hide();
-    const ptr: *WindowImpl = @ptrCast(@alignCast(self.impl));
-    const allocator = ptr.allocator;
-    allocator.destroy(ptr);
-    allocator.destroy(self);
-}
-
-pub fn setGeometry(self: *Self, rect: rad.Rect) !void {
-    const ptr: *WindowImpl = @ptrCast(@alignCast(self.impl));
-    if (ptr.srfc) |sr| {
-        try sr.resize(rect);
-    }
-    ptr.geometry = rect;
-    self.geometryChanged.emit();
-}
-
-pub fn getGeometry(self: *const Self) rad.Rect {
-    const ptr: *WindowImpl = @ptrCast(@alignCast(self.impl));
-    return ptr.geometry;
+    std.log.debug("Window Destroyed at {}", .{@intFromPtr(self)});
 }
