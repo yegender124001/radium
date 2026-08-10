@@ -8,3 +8,4 @@ pub const RasterWindow = @import("RasterWindow.zig");
 pub const Element = @import("Elements/Element.zig");
 pub const Platform = @import("Platforms/Platform.zig");
 pub const ProxyMap = @import("misc/proxymap.zig").ProxyMap;
+pub const Cairo = @import("Cairo/root.zig");

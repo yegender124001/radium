@@ -55,14 +55,6 @@ pub fn build(b: *std.Build) void {
         .target = target,
     });
 
-    const cairo = b.addModule("cairo", .{
-        .root_source_file = b.path("src/Cairo/root.zig"),
-        .link_libc = true,
-        .target = target,
-        .optimize = optimize,
-    });
-    cairo.linkSystemLibrary("cairo", .{});
-
     const xkbcommon = b.dependency("xkbcommon", .{});
     mod.addImport("xkbcommon", xkbcommon.module("xkbcommon"));
 
@@ -70,15 +62,19 @@ pub fn build(b: *std.Build) void {
     mod.addImport("pixman", pixman.module("pixman"));
 
     mod.addSystemIncludePath(.{ .cwd_relative = "/usr/include/cairo/" });
-    mod.addSystemIncludePath(.{ .cwd_relative = "/usr/include/freetype2/" });
     mod.addSystemIncludePath(.{ .cwd_relative = "/usr/include/pixman-1/" });
     mod.addSystemIncludePath(.{ .cwd_relative = "/usr/include/libpng16/" });
-    mod.addSystemIncludePath(.{ .cwd_relative = "/usr/include/harfbuzz/" });
+    mod.addSystemIncludePath(.{ .cwd_relative = "/usr/include/pango-1.0/" });
+    mod.addSystemIncludePath(.{ .cwd_relative = "/usr/include/glib-2.0/" });
+    mod.addSystemIncludePath(.{ .cwd_relative = "/usr/lib/glib-2.0/include/" });
+    mod.addIncludePath(b.path("src/Cairo/"));
     mod.addImport("wayland", wayland);
-    mod.addImport("cairo", cairo);
     mod.linkSystemLibrary("wayland-client", .{});
-
-    mod.linkSystemLibrary("freetype2", .{});
+    mod.linkSystemLibrary("cairo", .{});
+    mod.linkSystemLibrary("pango-1.0", .{});
+    mod.linkSystemLibrary("pangocairo-1.0", .{});
+    mod.linkSystemLibrary("gobject-2.0", .{});
+    mod.linkSystemLibrary("glib-2.0", .{});
     mod.linkSystemLibrary("pixman-1", .{});
     mod.linkSystemLibrary("png16", .{});
     mod.linkSystemLibrary("xkbcommon", .{});
@@ -111,7 +107,6 @@ pub fn build(b: *std.Build) void {
     });
 
     example_p1.root_module.addImport("radium", mod);
-    example_p1.root_module.addImport("cairo", cairo);
     b.installArtifact(example_p1);
 
     const run_p1 = b.addRunArtifact(example_p1);

@@ -1,6 +1,8 @@
-const Self = @This();
-const cr_ctx = @import("cairo").Context;
+const rad = @import("../root.zig");
+const cr_ctx = rad.Cairo.Context;
 const std = @import("std");
+
+const Self = @This();
 
 width: u32 = 0,
 height: u32 = 0,

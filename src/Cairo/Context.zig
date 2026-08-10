@@ -1,4 +1,5 @@
 const c = @import("c.zig").c;
+const std = @import("std");
 
 const Surface = @import("Surface.zig");
 handle: *c.cairo_t,
@@ -9,6 +10,25 @@ pub fn new(self: *Self, surface: *Surface) void {
     self.handle = c.cairo_create(surface.handle).?;
 }
 
+pub fn drawText(
+    cr: *c.cairo_t,
+    font_desc_str: [:0]const u8, // e.g. "Inter 14" or "Noto Sans Bold 16"
+    text: []const u8,
+    x: f64,
+    y: f64,
+) void {
+    const layout = c.pango_cairo_create_layout(cr).?;
+    defer c.g_object_unref(layout);
+
+    const desc = c.pango_font_description_from_string(font_desc_str.ptr);
+    defer c.pango_font_description_free(desc);
+    c.pango_layout_set_font_description(layout, desc);
+
+    c.pango_layout_set_text(layout, text.ptr, @intCast(text.len));
+
+    c.cairo_move_to(cr, x, y);
+    c.pango_cairo_show_layout(cr, layout);
+}
 pub fn paint(self: *Self) void {
     c.cairo_paint(self.handle);
 }

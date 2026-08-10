@@ -4,7 +4,7 @@ const rad = @import("root.zig");
 const App = rad.Application;
 
 const Self = @This();
-const Context = @import("cairo").Context;
+const Context = rad.Cairo.Context;
 const DEFAULT_WIDTH = 600;
 const DEFAULT_HEIGHT = 400;
 const DEFAULT_TITLE = "Radium"; // A string library with translations is needed

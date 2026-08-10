@@ -5,7 +5,7 @@ const std = @import("std");
 const wl = @import("wayland").client.wl;
 const xdg = @import("wayland").client.xdg;
 const zxdg = @import("wayland").client.zxdg;
-const cr = @import("cairo");
+const cr = rad.Cairo;
 
 win: *rad.RasterWindow,
 context: cr.Context = undefined,

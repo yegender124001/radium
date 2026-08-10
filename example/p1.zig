@@ -1,6 +1,6 @@
 const std = @import("std");
 const rad = @import("radium");
-const cairo = @import("cairo");
+const cairo = rad.Cairo;
 
 fn draw_red(e: *rad.Element, ctx: *cairo.Context) void {
     ctx.setSourceRGB(1, 0, 0);
