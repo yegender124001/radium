@@ -1,5 +1,4 @@
-// This file is AI-generated and will be replaced. It serves as a placeholder for the actual keyboard implementation.
-
+// Serving example
 const wl = @import("wayland").client.wl;
 
 const xkb = @import("xkbcommon");

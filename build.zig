@@ -111,6 +111,7 @@ pub fn build(b: *std.Build) void {
     });
 
     example_p1.root_module.addImport("radium", mod);
+    example_p1.root_module.addImport("cairo", cairo);
     b.installArtifact(example_p1);
 
     const run_p1 = b.addRunArtifact(example_p1);

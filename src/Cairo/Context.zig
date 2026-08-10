@@ -13,6 +13,13 @@ pub fn paint(self: *Self) void {
     c.cairo_paint(self.handle);
 }
 
+pub fn clear(self: *Self, r: f64, g: f64, b: f64, a: f64) void {
+    c.cairo_set_operator(self.handle, c.CAIRO_OPERATOR_SOURCE);
+    c.cairo_set_source_rgba(self.handle, r, g, b, a);
+    c.cairo_paint(self.handle);
+    c.cairo_set_operator(self.handle, c.CAIRO_OPERATOR_OVER);
+}
+
 pub fn setLineWidth(self: *Self, width: f64) void {
     c.cairo_set_line_width(self.handle, width);
 }
@@ -47,4 +54,16 @@ pub fn lineTo(self: *Self, x: f64, y: f64) void {
 
 pub fn deinit(self: *Self) void {
     c.cairo_destroy(self.handle);
+}
+
+pub fn translate(self: *Self, x: f64, y: f64) void {
+    c.cairo_translate(self.handle, x, y);
+}
+
+pub fn save(self: *Self) void {
+    c.cairo_save(self.handle);
+}
+
+pub fn restore(self: *Self) void {
+    c.cairo_restore(self.handle);
 }

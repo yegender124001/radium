@@ -49,11 +49,11 @@ fn xdgSurfaceListener(srfc: *xdg.Surface, event: xdg.Surface.Event, self: *Self)
             self.resizeBuffer(@intCast(self.win.width), @intCast(self.win.height)) catch return;
             self.surface.attach(self.buffer, 0, 0);
             self.surface.damage(0, 0, @intCast(self.win.width), @intCast(self.win.height));
-            self.xdgSurface.setWindowGeometry(0, 0, @intCast(self.win.width), @intCast(self.win.height));
             if (!self.initConfigure) {
                 const fr = self.surface.frame() catch return;
                 fr.setListener(*Self, frame, self);
             }
+            self.xdgSurface.setWindowGeometry(0, 0, @intCast(self.win.width), @intCast(self.win.height));
             self.surface.commit();
 
             self.initConfigure = true;
@@ -68,7 +68,14 @@ fn frame(cb: *wl.Callback, event: wl.Callback.Event, self: *Self) void {
             cb.destroy();
 
             // 2. Render the new frame content (e.g., update buffer via Cairo)
-            self.paint();
+            self.context.clear(
+                self.win.backgroundColor.r,
+                self.win.backgroundColor.g,
+                self.win.backgroundColor.b,
+                self.win.backgroundColor.a,
+            );
+            self.win.pDraw(self.win, &self.context);
+            self.cr_surface.flush();
 
             // 3. Request the NEXT frame callback
             const callback = self.surface.frame() catch return;
@@ -82,16 +89,13 @@ fn frame(cb: *wl.Callback, event: wl.Callback.Event, self: *Self) void {
     }
 }
 
-fn paint(self: *Self) void {
-    self.context.setSourceRGB(0, 0, 0);
-    self.context.paint();
-    self.context.setSourceRGB(1, 1, 1);
-    self.context.rectangle(self.win.mouseX - 50, self.win.mouseY - 50, 100, 100);
-    self.context.stroke();
-    self.cr_surface.flush();
-}
-
 fn resizeBuffer(self: *Self, w: i32, h: i32) !void {
+    self.context.clear(
+        self.win.backgroundColor.r,
+        self.win.backgroundColor.g,
+        self.win.backgroundColor.b,
+        self.win.backgroundColor.a,
+    );
     if (@as(u32, @intCast(w * h * 4)) > self.maxSize) {
         self.maxSize = @intCast(w * h * 4);
         _ = std.os.linux.ftruncate(@intCast(self.fd), @intCast(self.maxSize));
@@ -130,11 +134,16 @@ fn xdgToplevelListener(_: *xdg.Toplevel, event: xdg.Toplevel.Event, self: *Self)
             _ = self.resizeBuffer(@intCast(e.width), @intCast(e.height)) catch return;
             self.win.width = @intCast(e.width);
             self.win.height = @intCast(e.height);
+            if (self.win.rootElement) |x| {
+                x.height = @intCast(e.height);
+                x.width = @intCast(e.width);
+            }
         },
         .configure_bounds => {},
         .wm_capabilities => {},
     }
 }
+
 fn decorationListener(_: *zxdg.ToplevelDecorationV1, event: zxdg.ToplevelDecorationV1.Event, self: *Self) void {
     switch (event) {
         .configure => |e| {

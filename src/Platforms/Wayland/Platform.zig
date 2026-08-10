@@ -21,7 +21,7 @@ subcompositor: ?*wl.Subcompositor = null,
 seat: ?*wl.Seat = null,
 allocator: std.mem.Allocator,
 pointer: Pointer = undefined,
-keyboard: Keyboard = undefined,
+// keyboard: Keyboard = undefined,
 surfaces: rad.ProxyMap(Window),
 
 fn xdgWmBaseListener(wmBase: *xdg.WmBase, event: xdg.WmBase.Event, _: *Self) void {
@@ -50,7 +50,7 @@ fn registryListener(reg: *wl.Registry, event: wl.Registry.Event, self: *Self) vo
                 // TODO: Multi-Seat Support
                 self.seat = reg.bind(e.name, wl.Seat, e.version) catch return;
                 self.pointer.init(self.seat.?) catch return;
-                self.keyboard.init(self.seat.?) catch return;
+                // self.keyboard.init(self.seat.?) catch return;
             } else {}
         },
         .global_remove => {},
