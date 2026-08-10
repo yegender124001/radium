@@ -4,7 +4,7 @@ pub const shutdown = Application.shutdown;
 pub const getInstance = Application.getInstance;
 pub const run = Application.run;
 
-pub const Window = @import("Window.zig");
+pub const RasterWindow = @import("RasterWindow.zig");
 
 pub const Platform = @import("Platforms/Platform.zig");
 pub const ProxyMap = @import("misc/proxymap.zig").ProxyMap;

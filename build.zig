@@ -55,6 +55,14 @@ pub fn build(b: *std.Build) void {
         .target = target,
     });
 
+    const cairo = b.addModule("cairo", .{
+        .root_source_file = b.path("src/Cairo/root.zig"),
+        .link_libc = true,
+        .target = target,
+        .optimize = optimize,
+    });
+    cairo.linkSystemLibrary("cairo", .{});
+
     const xkbcommon = b.dependency("xkbcommon", .{});
     mod.addImport("xkbcommon", xkbcommon.module("xkbcommon"));
 
@@ -67,8 +75,9 @@ pub fn build(b: *std.Build) void {
     mod.addSystemIncludePath(.{ .cwd_relative = "/usr/include/libpng16/" });
     mod.addSystemIncludePath(.{ .cwd_relative = "/usr/include/harfbuzz/" });
     mod.addImport("wayland", wayland);
+    mod.addImport("cairo", cairo);
     mod.linkSystemLibrary("wayland-client", .{});
-    mod.linkSystemLibrary("cairo", .{});
+
     mod.linkSystemLibrary("freetype2", .{});
     mod.linkSystemLibrary("pixman-1", .{});
     mod.linkSystemLibrary("png16", .{});

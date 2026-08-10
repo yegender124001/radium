@@ -13,7 +13,7 @@ pub const Backend = union(enum) {
     Wayland: Wayland,
 };
 
-pub fn createWindow(self: *Platform, allocator: std.mem.Allocator, win: *rad.Window, ptr: *Window) !void {
+pub fn createWindow(self: *Platform, allocator: std.mem.Allocator, win: *rad.RasterWindow, ptr: *Window) !void {
     switch (self.backend) {
         .Wayland => |*w| {
             try w.createWindow(allocator, win, ptr);

@@ -87,7 +87,7 @@ pub fn deinit(self: *Self) void {
     self.display.disconnect();
 }
 
-pub fn createWindow(self: *Self, allocator: std.mem.Allocator, win: *rad.Window, ptr: *rad.Platform.Window) !void {
+pub fn createWindow(self: *Self, allocator: std.mem.Allocator, win: *rad.RasterWindow, ptr: *rad.Platform.Window) !void {
     const data = try allocator.create(Window);
     try data.init(win, ptr);
     try self.surfaces.register(data.surface, data);

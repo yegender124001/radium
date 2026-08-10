@@ -7,7 +7,7 @@ pub fn main(init: std.process.Init) !void {
     try rad.init(gpa);
     defer rad.shutdown(gpa);
 
-    var win: rad.Window = undefined;
+    var win: rad.RasterWindow = undefined;
     try win.init(gpa);
     defer win.deinit();
 

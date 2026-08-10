@@ -5,8 +5,11 @@ const std = @import("std");
 const wl = @import("wayland").client.wl;
 const xdg = @import("wayland").client.xdg;
 const zxdg = @import("wayland").client.zxdg;
+const cr = @import("cairo");
 
-win: *rad.Window,
+win: *rad.RasterWindow,
+context: cr.Context = undefined,
+cr_surface: cr.Surface = undefined,
 app: *rad.Application,
 surface: *wl.Surface,
 xdgSurface: *xdg.Surface,
@@ -16,6 +19,7 @@ shmPool: *wl.ShmPool = undefined,
 buffer: *wl.Buffer = undefined,
 fd: usize = 0,
 initConfigure: bool = false,
+addr: usize = 0,
 
 maxSize: u32 = 0,
 
@@ -42,12 +46,49 @@ fn xdgSurfaceListener(srfc: *xdg.Surface, event: xdg.Surface.Event, self: *Self)
         .configure => |e| {
             srfc.ackConfigure(e.serial);
 
+            self.resizeBuffer(@intCast(self.win.width), @intCast(self.win.height)) catch return;
             self.surface.attach(self.buffer, 0, 0);
             self.surface.damage(0, 0, @intCast(self.win.width), @intCast(self.win.height));
             self.xdgSurface.setWindowGeometry(0, 0, @intCast(self.win.width), @intCast(self.win.height));
+            if (!self.initConfigure) {
+                const fr = self.surface.frame() catch return;
+                fr.setListener(*Self, frame, self);
+            }
+            self.surface.commit();
+
+            self.initConfigure = true;
+        },
+    }
+}
+
+fn frame(cb: *wl.Callback, event: wl.Callback.Event, self: *Self) void {
+    switch (event) {
+        .done => {
+            // 1. Destroy the old frame callback object if your binding requires it
+            cb.destroy();
+
+            // 2. Render the new frame content (e.g., update buffer via Cairo)
+            self.paint();
+
+            // 3. Request the NEXT frame callback
+            const callback = self.surface.frame() catch return;
+            callback.setListener(*Self, frame, self);
+
+            // 4. Attach, damage, and commit the surface
+            self.surface.attach(self.buffer, 0, 0);
+            self.surface.damage(0, 0, @intCast(self.win.width), @intCast(self.win.height));
             self.surface.commit();
         },
     }
+}
+
+fn paint(self: *Self) void {
+    self.context.setSourceRGB(0, 0, 0);
+    self.context.paint();
+    self.context.setSourceRGB(1, 1, 1);
+    self.context.rectangle(self.win.mouseX - 50, self.win.mouseY - 50, 100, 100);
+    self.context.stroke();
+    self.cr_surface.flush();
 }
 
 fn resizeBuffer(self: *Self, w: i32, h: i32) !void {
@@ -56,7 +97,24 @@ fn resizeBuffer(self: *Self, w: i32, h: i32) !void {
         _ = std.os.linux.ftruncate(@intCast(self.fd), @intCast(self.maxSize));
         self.shmPool.resize(@intCast(self.maxSize));
     }
+    _ = std.os.linux.munmap(@ptrFromInt(self.addr), @intCast(self.win.width * self.win.height * 4));
+    self.context.deinit();
+    self.cr_surface.deinit();
 
+    self.addr = std.os.linux.mmap(
+        null,
+        @intCast(w * h * 4),
+        .{ .READ = true, .WRITE = true },
+        .{ .TYPE = .SHARED },
+        @intCast(self.fd),
+        0,
+    );
+
+    const pixl: [*]u8 = @ptrFromInt(self.addr);
+
+    self.cr_surface.createFromData(pixl, @intCast(w), @intCast(h), @intCast(w * 4));
+
+    self.context.new(&self.cr_surface);
     self.buffer.destroy();
     self.buffer = try self.shmPool.createBuffer(0, w, h, w * 4, .argb8888);
 }
@@ -89,7 +147,7 @@ fn decorationListener(_: *zxdg.ToplevelDecorationV1, event: zxdg.ToplevelDecorat
     }
 }
 
-pub fn init(self: *Self, win: *rad.Window, ptr: *rad.Platform.Window) !void {
+pub fn init(self: *Self, win: *rad.RasterWindow, ptr: *rad.Platform.Window) !void {
     var surface: *wl.Surface = undefined;
     const app = try rad.getInstance();
     if (app.platform.backend.Wayland.compositor) |comp| {
@@ -138,6 +196,20 @@ pub fn init(self: *Self, win: *rad.Window, ptr: *rad.Platform.Window) !void {
         _ = std.os.linux.ftruncate(@intCast(fd), @intCast(size));
         self.shmPool = try shm.createPool(@intCast(fd), @intCast(size));
         self.buffer = try self.shmPool.createBuffer(0, @intCast(self.win.width), @intCast(self.win.height), @intCast(self.win.width * 4), .argb8888);
+        self.addr = std.os.linux.mmap(
+            null,
+            @intCast(self.win.width * self.win.height * 4),
+            .{ .READ = true, .WRITE = true },
+            .{ .TYPE = .SHARED },
+            @intCast(self.fd),
+            0,
+        );
+
+        const pixl: [*]u8 = @ptrFromInt(self.addr);
+
+        self.cr_surface.createFromData(pixl, @intCast(self.win.width), @intCast(self.win.height), @intCast(self.win.width * 4));
+
+        self.context.new(&self.cr_surface);
     }
 
     surface.setListener(*Self, wlSurfaceListener, self);
@@ -151,6 +223,7 @@ pub fn init(self: *Self, win: *rad.Window, ptr: *rad.Platform.Window) !void {
 }
 
 fn deinit(self: *Self) void {
+    _ = std.os.linux.munmap(@ptrFromInt(self.addr), @intCast(self.win.width * self.win.height * 4));
     self.buffer.destroy();
     self.shmPool.destroy();
     _ = std.os.linux.close(@intCast(self.fd));

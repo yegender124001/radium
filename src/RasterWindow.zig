@@ -20,6 +20,8 @@ frameless: bool = false,
 title: [*:0]const u8 = DEFAULT_TITLE,
 pHandleEvents: *const fn (*Window, Events) void = handleEvents,
 
+mouseX: i32 = 0,
+mouseY: i32 = 0,
 pub const Events = union(enum) {
     Close,
     MouseMotion: struct { x: i32, y: i32 },
@@ -30,7 +32,10 @@ fn handleEvents(self: *Window, event: Events) void {
         .Close => {
             self.hide();
         },
-        .MouseMotion => {},
+        .MouseMotion => |e| {
+            self.mouseX = e.x;
+            self.mouseY = e.y;
+        },
     }
 }
 
