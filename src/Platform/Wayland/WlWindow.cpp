@@ -1,4 +1,7 @@
 #include "WlWindow.h"
+#include "Platform/Wayland/Surface.h"
+#include "Platform/Wayland/WlEGLBackingStore.h"
+#include "Platform/Wayland/WlRasterBackingStore.h"
 
 const int DEFAULT_WIDTH = 800;
 const int DEFAULT_HEIGHT = 600;
@@ -8,7 +11,7 @@ WlWindow::WlWindow()
     m_title = "A wayland client";
     m_height = DEFAULT_HEIGHT;
     m_width = DEFAULT_WIDTH;
-    m_backingStore = new WlRasterBackingStore(m_width, m_height);
+    m_backingStore = nullptr;
     m_toplevel = nullptr;
     m_visible = false;
 }
@@ -72,6 +75,9 @@ bool WlWindow::isVisible() const
 void WlWindow::createWindow()
 {
     m_toplevel = new XdgToplevel(this);
+    m_backingStore = new WlEGLBackingStore(m_toplevel, m_width, m_height);
+    // m_backingStore = new WlRasterBackingStore(m_width, m_height);
+    m_backingStore->resize(m_width, m_height);
     m_toplevel->setBackingStore(m_backingStore);
     m_toplevel->setTitle(m_title);
     m_visible = true;
@@ -79,6 +85,10 @@ void WlWindow::createWindow()
 
 void WlWindow::destroyWindow()
 {
+    if (m_backingStore) {
+        delete m_backingStore;
+        m_backingStore = nullptr;
+    }
     if (m_toplevel) {
         delete m_toplevel;
         m_toplevel = nullptr;

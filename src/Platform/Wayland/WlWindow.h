@@ -1,8 +1,9 @@
 #pragma once
 
 #include "../PlatformWindow.h"
+#include "Platform/Wayland/WlBackingStore.h"
+#include "Platform/Wayland/WlEGLBackingStore.h"
 #include "XdgToplevel.h"
-#include "WlRasterBackingStore.h"
 
 
 class WlWindow : public PlatformWindow
@@ -23,7 +24,7 @@ private:
     int m_width;
     int m_height;
     XdgToplevel *m_toplevel;
-    WlRasterBackingStore *m_backingStore;
+    WlBackingStore *m_backingStore;
     bool m_visible;
     std::string m_title;
 

@@ -8,6 +8,8 @@
 #include "viewporter.h"
 #include "wlr-layer-shell-unstable-v1.h"
 #include <wayland-client-protocol.h>
+#include <EGL/egl.h>
+
 
 class Wayland : public PlatformIntegration {
 public:
@@ -24,10 +26,18 @@ public:
     struct wp_fractional_scale_manager_v1* fractional_scale() const { return m_fractional_scale; }
     struct wp_viewporter* viewporter() const { return m_viewporter; }
     struct zwlr_layer_shell_v1* layer_shell() const { return m_layer_shell; }
+    EGLDisplay eglDisplay() const { return m_eglDisplay; }
+    EGLContext eglContext() const { return m_eglContext; }
+    EGLConfig eglConfig() const { return m_eglConfig; }
 
     void dispatch() override;
 private:
+    void initEGL();
+    void deinitEGL();
     struct wl_display* m_display;
+    EGLDisplay m_eglDisplay;
+    EGLConfig m_eglConfig;
+    EGLContext m_eglContext;
     struct wl_registry* m_registry;
     struct wl_compositor* m_compositor;
     struct wl_shm* m_shm;
