@@ -5,10 +5,45 @@ const int DEFAULT_HEIGHT = 600;
 
 WlWindow::WlWindow()
 {
-    m_backingStore = new WlRasterBackingStore(DEFAULT_WIDTH, DEFAULT_HEIGHT);
+    m_title = "A wayland client";
+    m_height = DEFAULT_HEIGHT;
+    m_width = DEFAULT_WIDTH;
+    m_backingStore = new WlRasterBackingStore(m_width, m_height);
     m_toplevel = nullptr;
     m_visible = false;
 }
+
+void WlWindow::setSize(int width, int height)
+{
+    if (m_backingStore) {
+        m_backingStore->resize(width, height);
+    }
+
+    if (m_toplevel) {
+        m_toplevel->resize(width, height);
+    }
+    m_width = width;
+    m_height = height;
+}
+
+void WlWindow::setTitle(const std::string& title)
+{
+    if (m_toplevel) {
+        m_toplevel->setTitle(title);
+    }
+    m_title = title;
+}
+
+int WlWindow::getWidth() const
+{
+    return m_width;
+}
+
+int WlWindow::getHeight() const
+{
+    return m_height;
+}
+
 
 WlWindow::~WlWindow()
 {
@@ -38,6 +73,7 @@ void WlWindow::createWindow()
 {
     m_toplevel = new XdgToplevel(this);
     m_toplevel->setBackingStore(m_backingStore);
+    m_toplevel->setTitle(m_title);
     m_visible = true;
 }
 

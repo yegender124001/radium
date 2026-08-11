@@ -13,6 +13,7 @@ public:
     struct wl_surface* getSurface() const { return m_surface; }
 
     void setBackingStore(WlBackingStore *backingStore);
+    virtual void resize(int width, int height) = 0;
 protected:
     WlBackingStore *m_backingStore = nullptr;
     virtual void configure() = 0;

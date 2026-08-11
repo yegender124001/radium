@@ -11,6 +11,8 @@ public:
     XdgToplevel(PlatformWindow *win);
     ~XdgToplevel() override;
 
+    void resize(int width, int height) override;
+    void setTitle(const std::string& title);
 protected:
     struct xdg_toplevel *m_toplevel;
     struct zxdg_toplevel_decoration_v1 *m_decor = nullptr;

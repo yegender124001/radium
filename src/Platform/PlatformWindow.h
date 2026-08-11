@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 class PlatformWindow {
 public:
   PlatformWindow() = default;
@@ -8,6 +9,8 @@ public:
   virtual void show() = 0;
   virtual void hide() = 0;
   virtual bool isVisible() const = 0;
-  // virtual void setTitle(const std::string& title) = 0;
-  // virtual void setSize(int width, int height) = 0;
+  virtual void setTitle(const std::string& title) = 0;
+  virtual void setSize(int width, int height) = 0;
+  virtual int getWidth() const = 0;
+  virtual int getHeight() const = 0;
 };

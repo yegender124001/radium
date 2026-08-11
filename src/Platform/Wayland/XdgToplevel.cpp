@@ -4,9 +4,6 @@
 #include <wayland-client-protocol.h>
 #include <wayland-util.h>
 
-const int DEFAULT_WIDTH = 800;
-const int DEFAULT_HEIGHT = 600;
-
 struct xdg_toplevel_listener XdgToplevel::m_listener = {
     .configure = toplevel_configure,
     .close = toplevel_close,
@@ -14,18 +11,22 @@ struct xdg_toplevel_listener XdgToplevel::m_listener = {
     .wm_capabilities = toplevel_wm_capabilities,
 };
 
-void XdgToplevel::toplevel_configure_bounds(void *data,
-					     struct xdg_toplevel *xdg_toplevel,
-					     int32_t width,
-					     int32_t height) {
+void XdgToplevel::resize(int width, int height) {
+  if (width == 0 || height == 0)
+    return;
 
+
+  m_width = width;
+  m_height = height;
 }
+
+void XdgToplevel::toplevel_configure_bounds(void *data,
+                                            struct xdg_toplevel *xdg_toplevel,
+                                            int32_t width, int32_t height) {}
 
 void XdgToplevel::toplevel_wm_capabilities(void *data,
-					   struct xdg_toplevel *xdg_toplevel,
-					   struct wl_array *capabilities) {
-
-}
+                                           struct xdg_toplevel *xdg_toplevel,
+                                           struct wl_array *capabilities) {}
 
 void XdgToplevel::toplevel_configure(void *data,
                                      struct xdg_toplevel *xdg_toplevel,
@@ -46,9 +47,12 @@ void XdgToplevel::toplevel_close(void *data,
   toplevel->m_win->hide();
 }
 
-XdgToplevel::XdgToplevel(PlatformWindow *win): m_win(win) {
-  m_width = DEFAULT_WIDTH;
-  m_height = DEFAULT_HEIGHT;
+void XdgToplevel::setTitle(const std::string& title) {
+  xdg_toplevel_set_title(m_toplevel, title.c_str());
+}
+XdgToplevel::XdgToplevel(PlatformWindow *win) : m_win(win) {
+  m_width = m_win->getWidth();
+  m_height = m_win->getHeight();
   m_toplevel = xdg_surface_get_toplevel(m_xdgSurface);
   if (m_platform->decoration())
     m_decor = zxdg_decoration_manager_v1_get_toplevel_decoration(
@@ -65,5 +69,7 @@ XdgToplevel::~XdgToplevel() {
 
 void XdgToplevel::configure() {
   m_backingStore->resize(m_width, m_height);
+  m_win->setSize(m_width, m_height);
+  xdg_surface_set_window_geometry(m_xdgSurface, 0, 0, m_width, m_height);
   flush();
 }

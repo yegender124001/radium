@@ -8,6 +8,7 @@ public:
     XdgSurface();
     virtual ~XdgSurface() ;
 
+virtual void resize(int width, int height) = 0;
 protected:
     struct xdg_surface *m_xdgSurface;
     Wayland *m_platform;

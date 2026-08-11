@@ -11,6 +11,11 @@ public:
     void hide();
     bool isVisible() const;
 
+    void setSize(int width, int height);
+    int getWidth() const;
+    int getHeight() const;
+
+
 private:
     PlatformWindow* m_platformWindow = nullptr;
     App* m_app;
