@@ -10,6 +10,7 @@ public:
     void run();
     PlatformIntegration* getPlatform() { return m_platform; };
     void createWindow(Window*);
+    void destroyWindow(Window*);
 private:
     App();
     ~App();

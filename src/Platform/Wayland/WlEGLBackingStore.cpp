@@ -2,6 +2,7 @@
 
 #include <EGL/egl.h>
 #include <EGL/eglplatform.h>
+#include <GL/gl.h>
 #include <wayland-egl.h>
 
 WlEGLBackingStore::WlEGLBackingStore(Surface *srfc, int width, int height) {
@@ -44,4 +45,12 @@ WlEGLBackingStore::~WlEGLBackingStore() {
 
 WlBuffer *WlEGLBackingStore::getBuffer() {
   return nullptr;
+}
+
+void WlEGLBackingStore::present(struct wl_surface *surface) {
+  (void)surface;
+  makeCurrent();
+  glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+  glClear(GL_COLOR_BUFFER_BIT);
+  swapBuffers();
 }

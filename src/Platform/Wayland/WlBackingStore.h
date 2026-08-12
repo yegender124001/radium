@@ -2,6 +2,8 @@
 
 #include "../PlatformBackingStore.h"
 
+struct wl_surface;
+
 struct WlBuffer {
     struct wl_buffer *buffer;
     bool isReleased;
@@ -16,4 +18,5 @@ public:
 
     virtual void resize(int width, int height) = 0;
     virtual WlBuffer* getBuffer() = 0;
+    virtual void present(struct wl_surface *surface) = 0;
 };

@@ -33,5 +33,6 @@ void Window::hide() {
 }
 
 Window::~Window() {
+    m_app->destroyWindow(this);
     delete m_platformWindow;
 }

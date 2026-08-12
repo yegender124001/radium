@@ -1,6 +1,7 @@
 #include "App.h"
 #include "Platform/Wayland/Wayland.h"
 #include "Window.h"
+#include <algorithm>
 
 App::App() {
     m_platform = static_cast<PlatformIntegration*>(new Wayland());
@@ -17,6 +18,13 @@ App* App::getInstance() {
 
 void App::createWindow(Window* window) {
     m_windows.push_back(window);
+}
+
+void App::destroyWindow(Window* window) {
+    auto it = std::find(m_windows.begin(), m_windows.end(), window);
+    if (it != m_windows.end()) {
+        m_windows.erase(it);
+    }
 }
 
 void App::shutdown() {

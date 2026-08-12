@@ -32,13 +32,11 @@ void XdgToplevel::toplevel_configure(void *data,
                                      struct xdg_toplevel *xdg_toplevel,
                                      int32_t width, int32_t height,
                                      struct wl_array *states) {
-  if (width == 0 || height == 0)
-    return;
   auto toplevel = static_cast<XdgToplevel *>(data);
-  if (width == toplevel->m_width && height == toplevel->m_height)
-    return;
-  toplevel->m_width = width;
-  toplevel->m_height = height;
+  if (width > 0)
+    toplevel->m_width = width;
+  if (height > 0)
+    toplevel->m_height = height;
 }
 
 void XdgToplevel::toplevel_close(void *data,
@@ -68,7 +66,6 @@ XdgToplevel::~XdgToplevel() {
 }
 
 void XdgToplevel::configure() {
-  m_backingStore->resize(m_width, m_height);
   m_win->setSize(m_width, m_height);
   xdg_surface_set_window_geometry(m_xdgSurface, 0, 0, m_width, m_height);
   flush();

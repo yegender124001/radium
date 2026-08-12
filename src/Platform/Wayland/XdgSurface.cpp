@@ -1,7 +1,7 @@
 #include "XdgSurface.h"
 #include "App.h"
 #include "xdg-shell.h"
-#include "stdexcept"
+#include <stdexcept>
 
 struct xdg_surface_listener XdgSurface::m_listener = {
     .configure = configure_xdg_srfc,

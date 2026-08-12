@@ -1,6 +1,7 @@
 #pragma once
 
 #include "WlBackingStore.h"
+#include <cstddef>
 #include <wayland-client.h>
 #include <vector>
 
@@ -16,6 +17,7 @@ public:
   ~WlRasterBackingStore() override;
 
   void resize(int width, int height) override;
+  void present(struct wl_surface *surface) override;
 
   WlBuffer* getBuffer() override;
 protected:
@@ -23,12 +25,16 @@ protected:
   struct wl_shm_pool *pool = nullptr;
   std::vector<WlRasterBuffer*> buffers;
 
-  int m_width;
-  int m_height;
+  int m_width = 0;
+  int m_height = 0;
 
-  int fd;
-  int maxSize;
+  int fd = -1;
+  size_t maxSize = 0;
+  void *m_data = nullptr;
+  size_t mappedSize = 0;
 
   void clearBuffers();
   void createBuffers(int width, int height);
+  void map();
+  void unmap();
 };

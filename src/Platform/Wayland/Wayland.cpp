@@ -1,13 +1,19 @@
 #include "Wayland.h"
 #include "linux-dmabuf-unstable-v1.h"
-#include "string.h"
 #include "xdg-shell.h"
 #include <cassert>
+#include <cstring>
 #include <stdexcept>
 #include <wayland-client-core.h>
 #include <wayland-client-protocol.h>
 
 void Wayland::dispatch() { wl_display_dispatch(m_display); }
+
+namespace {
+uint32_t clampVersion(uint32_t offered, uint32_t supported) {
+  return offered < supported ? offered : supported;
+}
+}
 
 struct xdg_wm_base_listener Wayland::base_listener = {
     .ping = Wayland::xdg_wm_base_ping,
@@ -29,41 +35,48 @@ void Wayland::registry_global(void *data, struct wl_registry *registry,
   Wayland *wayland = static_cast<Wayland *>(data);
   if (strcmp(interface, "wl_compositor") == 0) {
     wayland->m_compositor = static_cast<struct wl_compositor *>(
-        wl_registry_bind(registry, name, &wl_compositor_interface, version));
+        wl_registry_bind(registry, name, &wl_compositor_interface,
+                         clampVersion(version, 1)));
   }
   if (strcmp(interface, "wl_shm") == 0) {
     wayland->m_shm = static_cast<struct wl_shm *>(
-        wl_registry_bind(registry, name, &wl_shm_interface, version));
+        wl_registry_bind(registry, name, &wl_shm_interface,
+                         clampVersion(version, 1)));
   }
   if (strcmp(interface, zwp_linux_dmabuf_v1_interface.name) == 0) {
     wayland->m_dmabuf =
         static_cast<struct zwp_linux_dmabuf_v1 *>(wl_registry_bind(
-            registry, name, &zwp_linux_dmabuf_v1_interface, version));
+            registry, name, &zwp_linux_dmabuf_v1_interface,
+            clampVersion(version, 1)));
   }
   if (strcmp(interface, xdg_wm_base_interface.name) == 0) {
     wayland->m_base = static_cast<struct xdg_wm_base *>(
-        wl_registry_bind(registry, name, &xdg_wm_base_interface, version));
+        wl_registry_bind(registry, name, &xdg_wm_base_interface,
+                         clampVersion(version, 1)));
     xdg_wm_base_add_listener(wayland->m_base, &Wayland::base_listener, wayland);
   }
   if (strcmp(interface, zxdg_decoration_manager_v1_interface.name) == 0) {
     wayland->m_decoration =
         static_cast<struct zxdg_decoration_manager_v1 *>(wl_registry_bind(
-            registry, name, &zxdg_decoration_manager_v1_interface, version));
+            registry, name, &zxdg_decoration_manager_v1_interface,
+            clampVersion(version, 1)));
   }
   if (strcmp(interface, wp_fractional_scale_manager_v1_interface.name) == 0) {
     wayland->m_fractional_scale =
         static_cast<struct wp_fractional_scale_manager_v1 *>(wl_registry_bind(
             registry, name, &wp_fractional_scale_manager_v1_interface,
-            version));
+            clampVersion(version, 1)));
   }
   if (strcmp(interface, wp_viewporter_interface.name) == 0) {
     wayland->m_viewporter = static_cast<struct wp_viewporter *>(
-        wl_registry_bind(registry, name, &wp_viewporter_interface, version));
+        wl_registry_bind(registry, name, &wp_viewporter_interface,
+                         clampVersion(version, 1)));
   }
   if (strcmp(interface, zwlr_layer_shell_v1_interface.name) == 0) {
     wayland->m_layer_shell =
         static_cast<struct zwlr_layer_shell_v1 *>(wl_registry_bind(
-            registry, name, &zwlr_layer_shell_v1_interface, version));
+            registry, name, &zwlr_layer_shell_v1_interface,
+            clampVersion(version, 1)));
   }
 }
 

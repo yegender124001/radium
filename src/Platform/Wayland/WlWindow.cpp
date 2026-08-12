@@ -11,8 +11,6 @@ WlWindow::WlWindow()
     m_title = "A wayland client";
     m_height = DEFAULT_HEIGHT;
     m_width = DEFAULT_WIDTH;
-    m_backingStore = nullptr;
-    m_toplevel = nullptr;
     m_visible = false;
 }
 
@@ -51,10 +49,6 @@ int WlWindow::getHeight() const
 WlWindow::~WlWindow()
 {
     destroyWindow();
-    if (m_backingStore) {
-        delete m_backingStore;
-        m_backingStore = nullptr;
-    }
 }
 
 void WlWindow::show()
@@ -74,24 +68,16 @@ bool WlWindow::isVisible() const
 
 void WlWindow::createWindow()
 {
-    m_toplevel = new XdgToplevel(this);
-    m_backingStore = new WlEGLBackingStore(m_toplevel, m_width, m_height);
-    // m_backingStore = new WlRasterBackingStore(m_width, m_height);
-    m_backingStore->resize(m_width, m_height);
-    m_toplevel->setBackingStore(m_backingStore);
+    m_toplevel = std::make_unique<XdgToplevel>(this);
+    m_backingStore = std::make_unique<WlEGLBackingStore>(m_toplevel.get(), m_width, m_height);
+    m_toplevel->setBackingStore(m_backingStore.get());
     m_toplevel->setTitle(m_title);
     m_visible = true;
 }
 
 void WlWindow::destroyWindow()
 {
-    if (m_backingStore) {
-        delete m_backingStore;
-        m_backingStore = nullptr;
-    }
-    if (m_toplevel) {
-        delete m_toplevel;
-        m_toplevel = nullptr;
-        m_visible = false;
-    }
+    m_visible = false;
+    m_backingStore.reset();
+    m_toplevel.reset();
 }

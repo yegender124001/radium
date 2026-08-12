@@ -4,6 +4,8 @@
 #include "Platform/Wayland/WlBackingStore.h"
 #include "Platform/Wayland/WlEGLBackingStore.h"
 #include "XdgToplevel.h"
+#include <memory>
+#include <string>
 
 
 class WlWindow : public PlatformWindow
@@ -23,8 +25,8 @@ public:
 private:
     int m_width;
     int m_height;
-    XdgToplevel *m_toplevel;
-    WlBackingStore *m_backingStore;
+    std::unique_ptr<XdgToplevel> m_toplevel;
+    std::unique_ptr<WlBackingStore> m_backingStore;
     bool m_visible;
     std::string m_title;
 

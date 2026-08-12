@@ -15,6 +15,7 @@ public:
 
     void resize(int width, int height) override;
     WlBuffer* getBuffer() override;
+    void present(struct wl_surface *surface) override;
     void swapBuffers();
     void makeCurrent();
 
