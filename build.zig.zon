@@ -1,0 +1,7 @@
+.{
+    .name = .radium,
+    .version = "0.0.1",
+    .minimum_zig_version = "0.16.0",
+    .paths = .{""},
+    .fingerprint = 0xc1735339b4ad91d0,
+}
