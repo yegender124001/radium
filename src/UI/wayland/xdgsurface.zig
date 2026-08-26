@@ -7,6 +7,8 @@ xdg_surface: *c.xdg_surface = undefined,
 xdg_toplevel: ?*c.xdg_toplevel = null,
 srfc: *wl.Surface = undefined,
 configured: bool = false,
+shouldClose: bool = false,
+toplevelDecoration: *c.zxdg_toplevel_decoration_v1 = undefined,
 // }}}
 // XDG Toplevel Listener {{{
 fn xdg_toplevel_configure(data: ?*anyopaque, xdg_toplevel: ?*c.xdg_toplevel, width: i32, height: i32, _: [*c]c.wl_array) callconv(.c) void {
@@ -26,7 +28,14 @@ fn xdg_toplevel_configure(data: ?*anyopaque, xdg_toplevel: ?*c.xdg_toplevel, wid
     self.srfc.height = height;
 }
 
-fn xdg_toplevel_close(_: ?*anyopaque, _: ?*c.xdg_toplevel) callconv(.c) void {}
+fn xdg_toplevel_close(data: ?*anyopaque, _: ?*c.xdg_toplevel) callconv(.c) void {
+    var self: *Self = undefined;
+    if (data) |d| {
+        self = @ptrCast(@alignCast(d));
+    }
+
+    self.shouldClose = true;
+}
 
 fn xdg_toplevel_configure_bounds(_: ?*anyopaque, _: ?*c.xdg_toplevel, _: i32, _: i32) callconv(.c) void {}
 
@@ -52,9 +61,12 @@ fn xdg_surface_configure(data: ?*anyopaque, xdg_surface: ?*c.xdg_surface, serial
     }
 
     c.xdg_surface_ack_configure(xdg_srfc, serial);
-    self.configured = true;
     self.srfc.resize();
-    self.srfc.swapBuffers();
+    self.srfc.canRepaint = true;
+    if (!self.configured)
+        self.srfc.attachFrame();
+
+    self.configured = true;
 }
 
 const xdg_surface_listener = c.xdg_surface_listener{
@@ -86,12 +98,19 @@ pub fn initToplevel(self: *Self, srfc: *wl.Surface, state: *wl.State) !void {
         return error.FailedXDGToplevel;
     }
 
+    c.xdg_toplevel_set_title(self.xdg_toplevel.?, "Radium");
+
+    if (c.zxdg_decoration_manager_v1_get_toplevel_decoration(state.xdg_decoration_manager.?, self.xdg_toplevel)) |decor| {
+        self.toplevelDecoration = decor;
+    }
+
     _ = c.xdg_toplevel_add_listener(self.xdg_toplevel.?, &xdg_toplevel_listener, self);
 
     c.wl_surface_commit(srfc.wl_surface);
 }
 
 pub fn deinit(self: *Self) void {
+    c.zxdg_toplevel_decoration_v1_destroy(self.toplevelDecoration);
     if (self.xdg_toplevel) |toplevel| c.xdg_toplevel_destroy(toplevel);
     c.xdg_surface_destroy(self.xdg_surface);
 }

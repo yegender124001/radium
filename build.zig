@@ -51,9 +51,11 @@ pub fn build(b: *std.Build) !void {
         }),
     });
     example.root_module.addImport("radium", mod);
-
+    example.root_module.addIncludePath(b.path("external/glad/include/"));
+    example.root_module.addCSourceFile(.{ .file = b.path("external/glad/src/glad.c") });
     // For testing GL stuff
     example.root_module.linkSystemLibrary("gl", .{});
+    example.root_module.linkSystemLibrary("EGL", .{});
     b.installArtifact(example);
 
     const run_example = b.addRunArtifact(example);

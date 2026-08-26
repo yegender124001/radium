@@ -4,11 +4,43 @@ const c = @import("../../c.zig").c;
 const Self = @This();
 
 wl_surface: *c.wl_surface = undefined,
-width: i32 = 100,
-height: i32 = 100,
+width: i32 = 1280,
+height: i32 = 720,
 egl_window: *c.wl_egl_window = undefined,
 egl_surface: c.EGLSurface = null,
 state: *wl.State = undefined,
+frame: ?*c.wl_callback = null,
+canRepaint: bool = false,
+
+fn frame_done(data: ?*anyopaque, wl_callback: ?*c.wl_callback, _: u32) callconv(.c) void {
+    var self: *Self = undefined;
+    var cb: *c.wl_callback = undefined;
+
+    if (data) |d| {
+        self = @ptrCast(@alignCast(d));
+    }
+
+    if (wl_callback) |d| {
+        cb = @ptrCast(@alignCast(d));
+    }
+
+    c.wl_callback_destroy(cb);
+    self.frame = null;
+    self.canRepaint = true;
+
+    self.attachFrame();
+}
+
+const frame_listener = c.wl_callback_listener{
+    .done = frame_done,
+};
+
+pub fn attachFrame(self: *Self) void {
+    if (c.wl_surface_frame(self.wl_surface)) |fr|
+        self.frame = fr;
+    _ = c.wl_callback_add_listener(self.frame.?, &frame_listener, self);
+}
+
 pub fn init(self: *Self, state: *wl.State) !void {
     self.* = .{};
 
@@ -47,6 +79,7 @@ pub fn beginPaint(self: *Self) !void {
         return error.EGLMakeCurrentFailed;
     }
     c.glViewport(0, 0, self.width, self.height);
+    self.canRepaint = false;
 }
 
 pub fn endPaint(self: *Self) !void {
