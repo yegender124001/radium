@@ -16,21 +16,33 @@
 
 const std = @import("std");
 pub const Platform = @import("platform.zig");
+pub const Window = @import("window.zig");
 const wayland = @import("wayland/integration.zig");
 const Self = @This();
 
-var platformIntegration: Platform.Integration = undefined;
+var platformIntegration: ?Platform.Integration = null;
+
+pub fn getPlatform() !*const Platform.Integration {
+    if (platformIntegration) |plat| {
+        return &plat;
+    } else {
+        return error.NoPlatform;
+    }
+}
 
 pub fn init(allocator: std.mem.Allocator) !void {
     platformIntegration = try wayland.init(allocator);
 }
 pub fn deinit(allocator: std.mem.Allocator) void {
-    platformIntegration.deinit(allocator);
+    if (platformIntegration) |plat| {
+        plat.deinit(allocator);
+    }
 }
 
-pub fn run() void {
+pub fn run() !void {
+    if (platformIntegration == null) return error.NoPlatform;
     while (true) {
-        platformIntegration.dispatch();
+        platformIntegration.?.dispatch();
     }
 }
 

@@ -34,6 +34,7 @@ wlr_layer_shell: ?*zwlr.LayerShellV1 = null,
 const VTable: Platform.Integration.VTable = .{
     .deinit = deinit,
     .dispatch = dispatch,
+    .createWindow = @import("window.zig").createWindow,
 };
 
 fn shmListener(_: *wl.Shm, event: wl.Shm.Event, _: *Self) void {
@@ -87,6 +88,10 @@ pub fn init(allocator: std.mem.Allocator) !Platform.Integration {
 
     if (self.wl_shm == null) {
         return error.NoWaylandShm;
+    }
+
+    if (self.xdg_wm_base == null) {
+        return error.NoXdgWMBase;
     }
 
     _ = self.wl_display.dispatch();

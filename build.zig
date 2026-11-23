@@ -47,7 +47,7 @@ pub fn build(b: *std.Build) void {
     scanner.generate("zwlr_layer_shell_v1", 5);
 
     const radium_module = b.addModule("radium", .{
-        .root_source_file = b.path("src/root.zig"),
+        .root_source_file = b.path("src/radium.zig"),
         .optimize = optimize,
         .link_libc = true,
         .target = target,

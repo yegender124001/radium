@@ -6,4 +6,11 @@ pub fn main(init: std.process.Init) !void {
 
     try rad.init(gpa);
     defer rad.deinit(gpa);
+
+    var window = try rad.Window.init(gpa, .{
+        .title = "Hello World",
+    });
+    defer window.deinit(gpa);
+
+    try window.show(gpa);
 }

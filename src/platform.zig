@@ -14,16 +14,17 @@
 //! You should have received a copy of the GNU Lesser General Public License
 //! along with this program. If not, see <https://gnu.org>.
 const std = @import("std");
+const rad = @import("radium.zig");
 
 pub const Integration = struct {
     const Self = @This();
     pub const VTable = struct {
         deinit: *const fn (?*anyopaque, std.mem.Allocator) void,
         dispatch: *const fn (?*anyopaque) void,
-        // createWindow: *fn (?*anyopaque, std.mem.Allocator) *Window,
+        createWindow: *const fn (?*anyopaque, std.mem.Allocator, *rad.Window) anyerror!Window,
     };
     userdata: ?*anyopaque = null,
-    vtable: *const VTable = undefined,
+    vtable: *const VTable,
 
     pub fn deinit(self: Self, allocator: std.mem.Allocator) void {
         self.vtable.deinit(self.userdata, allocator);
@@ -32,6 +33,22 @@ pub const Integration = struct {
     pub fn dispatch(self: Self) void {
         self.vtable.dispatch(self.userdata);
     }
+
+    pub fn createWindow(self: Self, allocator: std.mem.Allocator, window: *rad.Window) !Window {
+        return try self.vtable.createWindow(self.userdata, allocator, window);
+    }
 };
-pub const Window = struct {};
+pub const Window = struct {
+    const Self = @This();
+
+    pub const VTable = struct {
+        deinit: *const fn (?*anyopaque, std.mem.Allocator) void,
+    };
+
+    userdata: ?*anyopaque = null,
+    vtable: *const VTable,
+    pub fn deinit(self: Self, allocator: std.mem.Allocator) void {
+        self.vtable.deinit(self.userdata, allocator);
+    }
+};
 pub const BackingStore = struct {};
