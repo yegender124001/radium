@@ -1,0 +1,9 @@
+[submodule "protocols/external/plasma-wayland-protocols"]
+	path = protocols/external/plasma-wayland-protocols
+	url = https://invent.kde.org/libraries/plasma-wayland-protocols.git
+[submodule "external/protocols/plasma-wayland-protocols"]
+	path = external/protocols/plasma-wayland-protocols
+	url = https://invent.kde.org/libraries/plasma-wayland-protocols.git
+[submodule "external/protocols/wlr-protocols"]
+	path = external/protocols/wlr-protocols
+	url = https://gitlab.freedesktop.org/wlroots/wlr-protocols.git

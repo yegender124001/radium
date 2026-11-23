@@ -1,0 +1,5 @@
+.directory
+.zig-cache/
+.zed/
+zig-pkg/
+zig-out/
