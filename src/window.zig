@@ -45,7 +45,7 @@ pub fn init(allocator: std.mem.Allocator, windowOptions: Options) !Self {
 
 pub fn show(self: *Self, allocator: std.mem.Allocator) !void {
     self.platformWindow = try (try rad.getPlatform()).createWindow(allocator, self);
-    self.platformBackingStore = try (try rad.getPlatform()).createRasterBackingStore(allocator, &self.platformWindow.?);
+    self.platformBackingStore = try (try rad.getPlatform()).createRasterBackingStore(allocator, self);
 }
 
 pub fn hide(self: *Self, allocator: std.mem.Allocator) void {

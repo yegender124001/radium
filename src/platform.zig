@@ -15,6 +15,7 @@
 //! along with this program. If not, see <https://gnu.org>.
 const std = @import("std");
 const rad = @import("radium.zig");
+const cairo = @import("zig-cairo");
 
 pub const Integration = struct {
     const Self = @This();
@@ -26,7 +27,7 @@ pub const Integration = struct {
         deinit: *const fn (?*anyopaque, std.mem.Allocator) void,
         dispatchEvent: *const fn (?*anyopaque) Event,
         createWindow: *const fn (?*anyopaque, std.mem.Allocator, *rad.Window) anyerror!Window,
-        createRasterBackingStore: *const fn (?*anyopaque, std.mem.Allocator, *Window) anyerror!RasterBackingStore,
+        createRasterBackingStore: *const fn (?*anyopaque, std.mem.Allocator, *rad.Window) anyerror!RasterBackingStore,
     };
     userdata: ?*anyopaque = null,
     vtable: *const VTable,
@@ -43,7 +44,7 @@ pub const Integration = struct {
         return try self.vtable.createWindow(self.userdata, allocator, window);
     }
 
-    pub fn createRasterBackingStore(self: Self, allocator: std.mem.Allocator, window: *Window) !RasterBackingStore {
+    pub fn createRasterBackingStore(self: Self, allocator: std.mem.Allocator, window: *rad.Window) !RasterBackingStore {
         return try self.vtable.createRasterBackingStore(self.userdata, allocator, window);
     }
 };
@@ -67,6 +68,9 @@ pub const RasterBackingStore = struct {
 
     pub const VTable = struct {
         deinit: *const fn (?*anyopaque, std.mem.Allocator) void,
+        getActiveCairoSurface: *const fn (?*anyopaque) anyerror!*cairo.Surface,
+        swapBuffers: *const fn (?*anyopaque) anyerror!void,
+        resize: *const fn (?*anyopaque) anyerror!void,
     };
 
     userdata: ?*anyopaque = null,
@@ -74,5 +78,17 @@ pub const RasterBackingStore = struct {
 
     pub fn deinit(self: Self, allocator: std.mem.Allocator) void {
         self.vtable.deinit(self.userdata, allocator);
+    }
+
+    pub fn getActiveCairoSurface(self: *Self) !*cairo.Surface {
+        return try self.vtable.getActiveCairoSurface(self.userdata);
+    }
+
+    pub fn swapBuffers(self: *Self) !void {
+        try self.vtable.swapBuffers(self.userdata);
+    }
+
+    pub fn resize(self: *Self) !void {
+        try self.resize();
     }
 };

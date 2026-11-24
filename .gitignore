@@ -3,3 +3,4 @@
 .zed/
 zig-pkg/
 zig-out/
+* copy.zig
