@@ -30,6 +30,7 @@ width: u32 = 1280,
 height: u32 = 720,
 title: [:0]const u8,
 platformWindow: ?rad.Platform.Window = null,
+platformBackingStore: ?rad.Platform.RasterBackingStore = null,
 radiumInstance: *rad,
 
 pub fn init(allocator: std.mem.Allocator, windowOptions: Options) !Self {
@@ -44,18 +45,27 @@ pub fn init(allocator: std.mem.Allocator, windowOptions: Options) !Self {
 
 pub fn show(self: *Self, allocator: std.mem.Allocator) !void {
     self.platformWindow = try (try rad.getPlatform()).createWindow(allocator, self);
+    self.platformBackingStore = try (try rad.getPlatform()).createRasterBackingStore(allocator, &self.platformWindow.?);
 }
 
 pub fn hide(self: *Self, allocator: std.mem.Allocator) void {
-    if (self.platformWindow) |win| {
+    if (self.platformWindow) |*win| {
         win.deinit(allocator);
         self.platformWindow = null;
+    }
+
+    if (self.platformBackingStore) |*store| {
+        store.deinit(allocator);
+        self.platformBackingStore = null;
     }
 }
 
 pub fn deinit(self: Self, allocator: std.mem.Allocator) void {
-    if (self.platformWindow) |win| {
+    if (self.platformWindow) |*win| {
         win.deinit(allocator);
+    }
+    if (self.platformBackingStore) |*store| {
+        store.deinit(allocator);
     }
     allocator.free(self.title);
 }

@@ -44,25 +44,11 @@ globals: *wayland_globals,
 window: *rad.Window,
 wl_surface: *wl.Surface,
 role: Role,
-wl_shm_pool: *wl.ShmPool = undefined,
-
-pendingBuffer: ?*wl.Buffer = null,
-sharedMemoryFd: std.posix.fd_t = 0,
+configured: bool = false,
 
 const VTable: rad.Platform.Window.VTable = .{
     .deinit = deinit,
 };
-
-fn frameListener(cb: *wl.Callback, event: wl.Callback.Event, self: *Self) void {
-    switch (event) {
-        .done => {
-            cb.destroy();
-            self.wl_surface.attach(self.pendingBuffer, 0, 0);
-            self.wl_surface.damage(0, 0, std.math.maxInt(i32), std.math.maxInt(i32)); // Setup damage tracking
-            self.wl_surface.commit();
-        },
-    }
-}
 
 fn surfaceListener(_: *wl.Surface, event: wl.Surface.Event, _: *Self) void {
     switch (event) {
@@ -73,14 +59,10 @@ fn surfaceListener(_: *wl.Surface, event: wl.Surface.Event, _: *Self) void {
 fn xdgSurfaceListener(surface: *xdg.Surface, event: xdg.Surface.Event, self: *Self) void {
     switch (event) {
         .configure => |e| {
-            // _ = self;
             //Here we change the buffer according to the new update of the surface
             surface.ackConfigure(e.serial);
 
-            self.pendingBuffer = self.wl_shm_pool.createBuffer(0, @intCast(self.window.width), @intCast(self.window.height), @intCast(self.window.width * 4), .argb8888) catch return;
-            self.wl_surface.attach(self.pendingBuffer.?, 0, 0);
-            self.wl_surface.damage(0, 0, std.math.maxInt(i32), std.math.maxInt(i32));
-            self.wl_surface.commit();
+            self.configured = true;
         },
     }
 }
@@ -107,14 +89,6 @@ fn xdgToplevelDecorationListener(toplevelDecor: *zxdg.ToplevelDecorationV1, even
     switch (event) {
         .configure => {},
     }
-}
-
-fn setupShmPool(self: *Self) !void {
-    self.sharedMemoryFd = try std.posix.memfd_create("radium-app", 0);
-    const size = self.window.width * self.window.height * 4 * 2;
-    _ = std.os.linux.ftruncate(@intCast(self.sharedMemoryFd), @intCast(size));
-
-    self.wl_shm_pool = try self.globals.wl_shm.?.createPool(@intCast(self.sharedMemoryFd), @intCast(size));
 }
 
 // Used by the Window. So, role will always be xdg_toplevel
@@ -162,8 +136,6 @@ pub fn createWindow(userdata: ?*anyopaque, allocator: std.mem.Allocator, window:
         },
     };
     self.wl_surface.commit();
-
-    try self.setupShmPool();
 
     return .{
         .userdata = @ptrCast(self),

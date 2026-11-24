@@ -35,6 +35,7 @@ const VTable: Platform.Integration.VTable = .{
     .deinit = deinit,
     .dispatchEvent = dispatchEvent,
     .createWindow = @import("window.zig").createWindow,
+    .createRasterBackingStore = @import("rasterbackingstore.zig").createRasterBackingStore,
 };
 
 fn shmListener(_: *wl.Shm, event: wl.Shm.Event, _: *Self) void {

@@ -24,6 +24,7 @@ pub fn build(b: *std.Build) void {
     const scanner = Scanner.create(b, .{});
     const wayland = b.createModule(.{ .root_source_file = scanner.result });
 
+    const cairo = b.dependency("cairo", .{});
     scanner.addSystemProtocol("stable/xdg-shell/xdg-shell.xml");
     scanner.addSystemProtocol("stable/viewporter/viewporter.xml");
     scanner.addSystemProtocol("stable/linux-dmabuf/linux-dmabuf-v1.xml");
@@ -53,6 +54,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
     });
     radium_module.addImport("zig-wayland", wayland);
+    radium_module.addImport("zig-cairo", cairo.module("cairo"));
     radium_module.linkSystemLibrary("wayland-client", .{});
 
     const tests = b.addTest(.{
