@@ -13,4 +13,6 @@ pub fn main(init: std.process.Init) !void {
     defer window.deinit(gpa);
 
     try window.show(gpa);
+
+    try rad.run();
 }

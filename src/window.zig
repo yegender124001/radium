@@ -18,6 +18,8 @@ const Self = @This();
 const std = @import("std");
 const rad = @import("radium.zig");
 
+pub const ID = u32;
+
 pub const Options = struct {
     width: u32 = 1280,
     height: u32 = 720,
@@ -28,9 +30,11 @@ width: u32 = 1280,
 height: u32 = 720,
 title: [:0]const u8,
 platformWindow: ?rad.Platform.Window = null,
+radiumInstance: *rad,
 
 pub fn init(allocator: std.mem.Allocator, windowOptions: Options) !Self {
     return .{
+        .radiumInstance = try rad.getInstance(),
         .platformWindow = null,
         .height = windowOptions.height,
         .title = try allocator.dupeSentinel(u8, windowOptions.title, 0),

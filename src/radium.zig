@@ -20,33 +20,47 @@ pub const Window = @import("window.zig");
 const wayland = @import("wayland/integration.zig");
 const Self = @This();
 
-var platformIntegration: ?Platform.Integration = null;
+var instance: ?Self = null;
 
-pub fn getPlatform() !*const Platform.Integration {
-    if (platformIntegration) |plat| {
-        return &plat;
+nextWindowId: Window.ID = 0,
+platformIntegration: ?Platform.Integration = null,
+
+pub fn getPlatform() !*Platform.Integration {
+    if (instance) |*inst| {
+        if (inst.platformIntegration) |*plat| {
+            return plat;
+        } else {
+            return error.NoPlatform;
+        }
     } else {
-        return error.NoPlatform;
+        return error.NoInstance;
+    }
+}
+
+pub fn getInstance() !*Self {
+    if (instance) |*inst| {
+        return inst;
+    } else {
+        return error.NoInstance;
     }
 }
 
 pub fn init(allocator: std.mem.Allocator) !void {
-    platformIntegration = try wayland.init(allocator);
+    instance = .{
+        .platformIntegration = try wayland.init(allocator),
+    };
 }
 pub fn deinit(allocator: std.mem.Allocator) void {
-    if (platformIntegration) |plat| {
-        plat.deinit(allocator);
+    if (instance) |*inst| {
+        if (inst.platformIntegration) |*plat| {
+            plat.deinit(allocator);
+        }
+        instance = null;
     }
 }
 
 pub fn run() !void {
-    if (platformIntegration == null) return error.NoPlatform;
-    while (true) {
-        platformIntegration.?.dispatch();
-    }
-}
-
-test "TestRadiumApp" {
-    try init(std.testing.allocator);
-    defer deinit(std.testing.allocator);
+    if (instance == null) return error.NoInstance;
+    if (instance.?.platformIntegration == null) return error.NoPlatform;
+    while (instance.?.platformIntegration.?.dispatchEvent() == .None) {}
 }

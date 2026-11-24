@@ -44,8 +44,10 @@ globals: *wayland_globals,
 window: *rad.Window,
 wl_surface: *wl.Surface,
 role: Role,
-pool: *wl.ShmPool = undefined,
+wl_shm_pool: *wl.ShmPool = undefined,
+
 pendingBuffer: ?*wl.Buffer = null,
+sharedMemoryFd: std.posix.fd_t = 0,
 
 const VTable: rad.Platform.Window.VTable = .{
     .deinit = deinit,
@@ -71,9 +73,14 @@ fn surfaceListener(_: *wl.Surface, event: wl.Surface.Event, _: *Self) void {
 fn xdgSurfaceListener(surface: *xdg.Surface, event: xdg.Surface.Event, self: *Self) void {
     switch (event) {
         .configure => |e| {
-            _ = self;
+            // _ = self;
             //Here we change the buffer according to the new update of the surface
             surface.ackConfigure(e.serial);
+
+            self.pendingBuffer = self.wl_shm_pool.createBuffer(0, @intCast(self.window.width), @intCast(self.window.height), @intCast(self.window.width * 4), .argb8888) catch return;
+            self.wl_surface.attach(self.pendingBuffer.?, 0, 0);
+            self.wl_surface.damage(0, 0, std.math.maxInt(i32), std.math.maxInt(i32));
+            self.wl_surface.commit();
         },
     }
 }
@@ -81,7 +88,12 @@ fn xdgSurfaceListener(surface: *xdg.Surface, event: xdg.Surface.Event, self: *Se
 fn xdgToplevelListener(toplevel: *xdg.Toplevel, event: xdg.Toplevel.Event, self: *Self) void {
     _ = toplevel;
     switch (event) {
-        .configure => {},
+        .configure => |e| {
+            if (e.width != 0 or e.height != 0) {
+                self.window.width = @intCast(e.width);
+                self.window.height = @intCast(e.height);
+            }
+        },
         .close => {
             self.window.hide(self.allocator);
         },
@@ -95,6 +107,14 @@ fn xdgToplevelDecorationListener(toplevelDecor: *zxdg.ToplevelDecorationV1, even
     switch (event) {
         .configure => {},
     }
+}
+
+fn setupShmPool(self: *Self) !void {
+    self.sharedMemoryFd = try std.posix.memfd_create("radium-app", 0);
+    const size = self.window.width * self.window.height * 4 * 2;
+    _ = std.os.linux.ftruncate(@intCast(self.sharedMemoryFd), @intCast(size));
+
+    self.wl_shm_pool = try self.globals.wl_shm.?.createPool(@intCast(self.sharedMemoryFd), @intCast(size));
 }
 
 // Used by the Window. So, role will always be xdg_toplevel
@@ -126,6 +146,7 @@ pub fn createWindow(userdata: ?*anyopaque, allocator: std.mem.Allocator, window:
                 .xdg_toplevel = blk: {
                     const toplevel = try self.role.toplevel.xdg_surface.getToplevel();
                     toplevel.setListener(*Self, xdgToplevelListener, self);
+                    toplevel.setTitle(self.window.title);
                     break :blk toplevel;
                 },
                 .xdg_decoration = blk: {
@@ -141,6 +162,8 @@ pub fn createWindow(userdata: ?*anyopaque, allocator: std.mem.Allocator, window:
         },
     };
     self.wl_surface.commit();
+
+    try self.setupShmPool();
 
     return .{
         .userdata = @ptrCast(self),

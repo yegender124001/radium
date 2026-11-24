@@ -33,7 +33,7 @@ wlr_layer_shell: ?*zwlr.LayerShellV1 = null,
 
 const VTable: Platform.Integration.VTable = .{
     .deinit = deinit,
-    .dispatch = dispatch,
+    .dispatchEvent = dispatchEvent,
     .createWindow = @import("window.zig").createWindow,
 };
 
@@ -132,12 +132,19 @@ pub fn deinit(userdata: ?*anyopaque, allocator: std.mem.Allocator) void {
     }
 }
 
-pub fn dispatch(userdata: ?*anyopaque) void {
+pub fn dispatchEvent(userdata: ?*anyopaque) Platform.Integration.Event {
     if (userdata) |data| {
         const self: *Self = @ptrCast(@alignCast(data));
         switch (self.wl_display.dispatch()) {
-            // TODO: Implement this switch
-            else => {},
+            .SUCCESS => {
+                return .None;
+            },
+            else => {
+                const src = @src();
+                std.log.debug("You should check out this thing at line : {} in file {s}", .{ src.line, src.file });
+                return .Quit;
+            },
         }
     }
+    return .Quit;
 }

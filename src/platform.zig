@@ -18,9 +18,13 @@ const rad = @import("radium.zig");
 
 pub const Integration = struct {
     const Self = @This();
+    pub const Event = enum {
+        Quit,
+        None,
+    };
     pub const VTable = struct {
         deinit: *const fn (?*anyopaque, std.mem.Allocator) void,
-        dispatch: *const fn (?*anyopaque) void,
+        dispatchEvent: *const fn (?*anyopaque) Event,
         createWindow: *const fn (?*anyopaque, std.mem.Allocator, *rad.Window) anyerror!Window,
     };
     userdata: ?*anyopaque = null,
@@ -30,8 +34,8 @@ pub const Integration = struct {
         self.vtable.deinit(self.userdata, allocator);
     }
 
-    pub fn dispatch(self: Self) void {
-        self.vtable.dispatch(self.userdata);
+    pub fn dispatchEvent(self: Self) Event {
+        return self.vtable.dispatchEvent(self.userdata);
     }
 
     pub fn createWindow(self: Self, allocator: std.mem.Allocator, window: *rad.Window) !Window {
