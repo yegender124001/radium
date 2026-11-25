@@ -82,24 +82,25 @@ fn resize(userdata: ?*anyopaque) !void {
             // We don't make the size of less
         }
         try self.createBuffers(self.allocator);
+        try swapBuffers(userdata);
     }
 }
 
 fn swapBuffers(userdata: ?*anyopaque) !void {
-    // This is bugged. Active buffer is displayed on the screen. We want to actually have a buffer that is pending to draw lol.
     if (userdata) |data| {
         const self: *Self = @ptrCast(@alignCast(data));
         const platformWindow: *WaylandWindow = @ptrCast(@alignCast((&self.window.platformWindow.?).userdata.?));
-        for (self.buffers.items) |*buffer| {
-            if (buffer.released == true) {
-                if (platformWindow.configured == true) {
-                    platformWindow.wl_surface.attach(buffer.buffer, 0, 0);
-                    platformWindow.wl_surface.damage(0, 0, @intCast(self.window.width), @intCast(self.window.height));
-                    platformWindow.wl_surface.commit();
-                    buffer.released = false;
-                    self.activeBuffer = buffer;
-                    break;
-                }
+        const wl_surface = platformWindow.wl_surface;
+        const wp_viewport = platformWindow.wp_viewport;
+        wl_surface.attach(self.activeBuffer.buffer, 0, 0);
+        wl_surface.damage(0, 0, @intCast(self.window.width), @intCast(self.window.height));
+        wp_viewport.setDestination(@intCast(self.window.width), @intCast(self.window.height));
+        wl_surface.commit();
+        self.activeBuffer.released = false;
+
+        for (self.buffers.items) |*item| {
+            if (item.released == true) {
+                self.activeBuffer = item;
             }
         }
     }

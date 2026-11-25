@@ -17,6 +17,7 @@
 const Platform = @import("../platform.zig");
 const std = @import("std");
 const wl_client = @import("zig-wayland").client;
+const wp = wl_client.wp;
 const wl = wl_client.wl;
 const xdg = wl_client.xdg;
 const zxdg = wl_client.zxdg;
@@ -26,6 +27,7 @@ const Self = @This();
 wl_display: *wl.Display,
 wl_registry: *wl.Registry,
 wl_compositor: ?*wl.Compositor = null,
+wp_viewporter: ?*wp.Viewporter = null,
 wl_shm: ?*wl.Shm = null,
 xdg_wm_base: ?*xdg.WmBase = null,
 xdg_decoration: ?*zxdg.DecorationManagerV1 = null,
@@ -67,6 +69,8 @@ fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, self: *Sel
                 self.xdg_decoration = registry.bind(e.name, zxdg.DecorationManagerV1, e.version) catch return;
             } else if (std.mem.orderZ(u8, e.interface, zwlr.LayerShellV1.interface.name) == .eq) {
                 self.wlr_layer_shell = registry.bind(e.name, zwlr.LayerShellV1, e.version) catch return;
+            } else if (std.mem.orderZ(u8, e.interface, wp.Viewporter.interface.name) == .eq) {
+                self.wp_viewporter = registry.bind(e.name, wp.Viewporter, e.version) catch return;
             }
         },
         .global_remove => {},
@@ -105,6 +109,10 @@ pub fn init(allocator: std.mem.Allocator) !Platform.Integration {
 pub fn deinit(userdata: ?*anyopaque, allocator: std.mem.Allocator) void {
     if (userdata) |data| {
         const self: *Self = @ptrCast(@alignCast(data));
+
+        if (self.wp_viewporter) |viewporter| {
+            viewporter.destroy();
+        }
 
         if (self.wl_compositor) |comp| {
             comp.destroy();

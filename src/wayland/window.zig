@@ -21,6 +21,8 @@ const wayland_globals = @import("integration.zig");
 const std = @import("std");
 const wl_client = @import("zig-wayland").client;
 const wl = wl_client.wl;
+const zwp = wl_client.zwp;
+const wp = wl_client.wp;
 const xdg = wl_client.xdg;
 const zxdg = wl_client.zxdg;
 const zwlr = wl_client.zwlr;
@@ -44,8 +46,14 @@ allocator: std.mem.Allocator, // Needed to stored to hide the window
 globals: *wayland_globals,
 window: *rad.Window,
 wl_surface: *wl.Surface,
+wp_viewport: *wp.Viewport,
 role: Role,
 configured: bool = false,
+
+is_maximized: bool = false,
+is_fullscreen: bool = false,
+is_resizing: bool = false,
+is_activated: bool = false,
 
 const VTable: rad.Platform.Window.VTable = .{
     .deinit = deinit,
@@ -57,42 +65,41 @@ fn surfaceListener(_: *wl.Surface, event: wl.Surface.Event, _: *Self) void {
     }
 }
 
-fn xdgSurfaceListener(surface: *xdg.Surface, event: xdg.Surface.Event, self: *Self) void {
-    switch (event) {
-        .configure => |e| {
-            //Here we change the buffer according to the new update of the surface
-            surface.ackConfigure(e.serial);
-
-            self.configured = true;
-            self.window.platformBackingStore.?.swapBuffers() catch return;
-            const srfc = self.window.platformBackingStore.?.getActiveCairoSurface() catch return;
-            var ctx = srfc.createContext() catch return;
-            ctx.setSourceRgba(0.0, 0.0, 0.0, 0.7) catch return;
-            ctx.paint() catch return;
-
-            ctx.setSourceRgb(0.0, 0.0, 0.0) catch return;
-            ctx.rectangle(300.0, 0.0, @floatFromInt(@as(i32, @intCast(self.window.width)) - 300), @floatFromInt(self.window.height)) catch return;
-            ctx.fill() catch return;
-
-            ctx.setSourceRgb(0.3, 0.5, 0.9) catch return;
-            ctx.setLineWidth(2.0) catch return;
-            ctx.rectangle(0.0, 200.0, @floatFromInt(self.window.width), @floatFromInt(@as(i32, @intCast(self.window.height)) - 400)) catch return;
-            ctx.fill() catch return;
-            ctx.deinit();
-        },
-    }
-}
-
 fn xdgToplevelListener(toplevel: *xdg.Toplevel, event: xdg.Toplevel.Event, self: *Self) void {
     _ = toplevel;
     switch (event) {
         .configure => |e| {
+            var is_maximized = false;
+            var is_activated = false;
+            var is_fullscreen = false;
+            var is_resizing = false;
+            for (e.states.slice(c_int)) |raw_state| {
+                const state: xdg.Toplevel.State = @fromBackingInt(@intCast(raw_state));
+                switch (state) {
+                    .maximized => is_maximized = true,
+                    .fullscreen => is_fullscreen = true,
+                    .resizing => is_resizing = true,
+                    .activated => is_activated = true,
+                    else => {},
+                }
+            }
+
+            self.is_resizing = is_resizing;
+            self.is_maximized = is_maximized;
+            self.is_activated = is_activated;
+            self.is_fullscreen = is_fullscreen;
+
             if ((e.width != 0 or e.height != 0) and
                 (e.width != @as(i32, @intCast(self.window.width)) or
-                    e.height != @as(i32, @intCast(self.window.height))))
+                    e.height != @as(i32, @intCast(self.window.height)) or
+                    self.is_resizing == false))
             {
                 self.window.width = @intCast(e.width);
                 self.window.height = @intCast(e.height);
+
+                if (self.is_resizing == true) return; // Pahale resize karlo aram se fir dekhenge
+
+                // Ab dekhte hai
                 if (self.window.platformBackingStore) |*store| {
                     store.resize() catch |err| switch (err) {
                         else => {
@@ -119,6 +126,100 @@ fn xdgToplevelDecorationListener(toplevelDecor: *zxdg.ToplevelDecorationV1, even
     }
 }
 
+fn drawDebugGrid(
+    ctx: *cairo.Context, // or *cairo.Context depending on your wrapper
+    width_px: i32,
+    height_px: i32,
+    cell_px: f64,
+) !void {
+    const w: f64 = @floatFromInt(width_px);
+    const h: f64 = @floatFromInt(height_px);
+
+    // 1. Hard-clear previous buffer contents (prevents ghosting)
+    try ctx.setOperator(.Clear);
+    try ctx.paint();
+    try ctx.setOperator(.Over);
+
+    // Translucent backdrop
+    try ctx.setSourceRgba(0.05, 0.06, 0.09, 0.85);
+    try ctx.paint();
+
+    // 2. Minor grid lines (every cell_px)
+    try ctx.setSourceRgba(0.35, 0.65, 1.0, 0.25);
+    try ctx.setLineWidth(1.0);
+
+    var x: f64 = 0.0;
+    while (x <= w) : (x += cell_px) {
+        try ctx.moveTo(x, 0.0);
+        try ctx.lineTo(x, h);
+    }
+
+    var y: f64 = 0.0;
+    while (y <= h) : (y += cell_px) {
+        try ctx.moveTo(0.0, y);
+        try ctx.lineTo(w, y);
+    }
+    try ctx.stroke();
+
+    // 3. Major grid lines (every 4 cells) + axis crosshairs
+    const major_step = cell_px * 4.0;
+    try ctx.setSourceRgba(0.4, 0.85, 1.0, 0.65);
+    try ctx.setLineWidth(1.5);
+
+    var mx: f64 = 0.0;
+    while (mx <= w) : (mx += major_step) {
+        try ctx.moveTo(mx, 0.0);
+        try ctx.lineTo(mx, h);
+    }
+
+    var my: f64 = 0.0;
+    while (my <= h) : (my += major_step) {
+        try ctx.moveTo(0.0, my);
+        try ctx.lineTo(w, my);
+    }
+    try ctx.stroke();
+
+    // 4. Diagonals (catches non-uniform X/Y stretching immediately)
+    try ctx.setSourceRgba(1.0, 0.35, 0.45, 0.75);
+    try ctx.setLineWidth(2.0);
+    try ctx.moveTo(0.0, 0.0);
+    try ctx.lineTo(w, h);
+    try ctx.moveTo(w, 0.0);
+    try ctx.lineTo(0.0, h);
+    try ctx.stroke();
+
+    // 5. Outer border & right/bottom edge ticks
+    try ctx.setSourceRgba(0.2, 1.0, 0.6, 0.9);
+    try ctx.setLineWidth(3.0);
+    try ctx.rectangle(1.5, 1.5, @max(0.0, w - 3.0), @max(0.0, h - 3.0));
+    try ctx.stroke();
+}
+
+fn xdgSurfaceListener(surface: *xdg.Surface, event: xdg.Surface.Event, self: *Self) void {
+    switch (event) {
+        .configure => |e| {
+            surface.ackConfigure(e.serial);
+            self.configured = true;
+
+            if (self.is_resizing == true) {
+                self.wp_viewport.setDestination(@intCast(self.window.width), @intCast(self.window.height));
+                self.wl_surface.commit();
+            } else {
+                const srfc = self.window.platformBackingStore.?.getActiveCairoSurface() catch return;
+                var ctx = srfc.createContext() catch return;
+                drawDebugGrid(
+                    &ctx,
+                    @intCast(self.window.width),
+                    @intCast(self.window.height),
+                    32.0,
+                ) catch return;
+                ctx.deinit();
+                self.window.platformBackingStore.?.swapBuffers() catch return;
+            }
+        },
+    }
+}
+
 // Used by the Window. So, role will always be xdg_toplevel
 pub fn createWindow(userdata: ?*anyopaque, allocator: std.mem.Allocator, window: *rad.Window) !rad.Platform.Window {
     var globals: *wayland_globals = undefined;
@@ -137,6 +238,10 @@ pub fn createWindow(userdata: ?*anyopaque, allocator: std.mem.Allocator, window:
             const srfc = try self.globals.wl_compositor.?.createSurface();
             srfc.setListener(*Self, surfaceListener, self);
             break :blk srfc;
+        },
+        .wp_viewport = blk: {
+            const viewport = try self.globals.wp_viewporter.?.getViewport(self.wl_surface);
+            break :blk viewport;
         },
         .role = .{
             .toplevel = .{
