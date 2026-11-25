@@ -11,3 +11,5 @@ zig-out/
 # Zed stuff
 .zed/
 * copy.zig
+
+err
