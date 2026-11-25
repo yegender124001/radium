@@ -50,11 +50,6 @@ wp_viewport: *wp.Viewport,
 role: Role,
 configured: bool = false,
 
-is_maximized: bool = false,
-is_fullscreen: bool = false,
-is_resizing: bool = false,
-is_activated: bool = false,
-
 const VTable: rad.Platform.Window.VTable = .{
     .deinit = deinit,
 };
@@ -73,6 +68,7 @@ fn xdgToplevelListener(toplevel: *xdg.Toplevel, event: xdg.Toplevel.Event, self:
             var is_activated = false;
             var is_fullscreen = false;
             var is_resizing = false;
+
             for (e.states.slice(c_int)) |raw_state| {
                 const state: xdg.Toplevel.State = @fromBackingInt(@intCast(raw_state));
                 switch (state) {
@@ -84,15 +80,15 @@ fn xdgToplevelListener(toplevel: *xdg.Toplevel, event: xdg.Toplevel.Event, self:
                 }
             }
 
-            self.is_resizing = is_resizing;
-            self.is_maximized = is_maximized;
-            self.is_activated = is_activated;
-            self.is_fullscreen = is_fullscreen;
+            self.window.is_resizing = is_resizing;
+            self.window.is_maximized = is_maximized;
+            self.window.is_activated = is_activated;
+            self.window.is_fullscreen = is_fullscreen;
 
             if ((e.width != 0 or e.height != 0) and
                 (e.width != @as(i32, @intCast(self.window.width)) or
                     e.height != @as(i32, @intCast(self.window.height)) or
-                    self.is_resizing == false))
+                    self.window.is_resizing == false))
             {
                 self.window.width = @intCast(e.width);
                 self.window.height = @intCast(e.height);

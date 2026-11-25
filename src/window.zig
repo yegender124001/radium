@@ -32,6 +32,10 @@ title: [:0]const u8,
 platformWindow: ?rad.Platform.Window = null,
 platformBackingStore: ?rad.Platform.RasterBackingStore = null,
 radiumInstance: *rad,
+is_active: bool = false,
+is_maximized: bool = false,
+is_resizing: bool = false,
+is_fullscreen: bool = false,
 
 pub fn init(allocator: std.mem.Allocator, windowOptions: Options) !Self {
     return .{
