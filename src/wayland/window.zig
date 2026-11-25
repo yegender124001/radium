@@ -60,6 +60,12 @@ fn surfaceListener(_: *wl.Surface, event: wl.Surface.Event, _: *Self) void {
     }
 }
 
+fn draw(self: *Self, ctx: *cairo.Context) !void {
+    try ctx.setSourceRgb(1.0, 0.0, 0.0);
+    try ctx.paint();
+    _ = self;
+}
+
 fn xdgToplevelListener(toplevel: *xdg.Toplevel, event: xdg.Toplevel.Event, self: *Self) void {
     _ = toplevel;
     switch (event) {
@@ -122,8 +128,9 @@ fn xdgToplevelDecorationListener(toplevelDecor: *zxdg.ToplevelDecorationV1, even
     }
 }
 
+// We will use this thing when needed. For now, it's just a left over
 fn drawDebugGrid(
-    ctx: *cairo.Context, // or *cairo.Context depending on your wrapper
+    ctx: *cairo.Context,
     width_px: i32,
     height_px: i32,
     cell_px: f64,
@@ -203,12 +210,10 @@ fn xdgSurfaceListener(surface: *xdg.Surface, event: xdg.Surface.Event, self: *Se
             } else {
                 const srfc = self.window.platformBackingStore.?.getActiveCairoSurface() catch return;
                 var ctx = srfc.createContext() catch return;
-                drawDebugGrid(
-                    &ctx,
-                    @intCast(self.window.width),
-                    @intCast(self.window.height),
-                    32.0,
-                ) catch return;
+                ctx.setOperator(.Clear) catch return;
+                ctx.paint() catch return;
+                ctx.setOperator(.Over) catch return;
+                self.draw(&ctx) catch return;
                 ctx.deinit();
                 self.window.platformBackingStore.?.swapBuffers() catch return;
             }
@@ -265,6 +270,22 @@ pub fn createWindow(userdata: ?*anyopaque, allocator: std.mem.Allocator, window:
         },
     };
     self.wl_surface.commit();
+
+    if (self.window.is_fullscreen == true) {
+        self.role.toplevel.xdg_toplevel.setFullscreen(null);
+    } else {
+        self.role.toplevel.xdg_toplevel.unsetFullscreen();
+    }
+
+    if (self.window.is_maximized == true) {
+        self.role.toplevel.xdg_toplevel.setMaximized();
+    } else {
+        self.role.toplevel.xdg_toplevel.unsetMaximized();
+    }
+
+    if (self.window.is_minimized == true) {
+        self.role.toplevel.xdg_toplevel.setMinimized();
+    }
 
     return .{
         .userdata = @ptrCast(self),

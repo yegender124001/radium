@@ -17,6 +17,7 @@
 const Self = @This();
 const std = @import("std");
 const rad = @import("radium.zig");
+const cairo = @import("zig-cairo");
 
 pub const ID = u32;
 
@@ -24,6 +25,9 @@ pub const Options = struct {
     width: u32 = 1280,
     height: u32 = 720,
     title: [:0]const u8 = "Hello World",
+    fullscreen: bool = false,
+    maximize: bool = false,
+    minimize: bool = false,
 };
 
 width: u32 = 1280,
@@ -35,6 +39,7 @@ radiumInstance: *rad,
 is_activated: bool = false,
 is_maximized: bool = false,
 is_resizing: bool = false,
+is_minimized: bool = false,
 is_fullscreen: bool = false,
 
 pub fn init(allocator: std.mem.Allocator, windowOptions: Options) !Self {
@@ -44,6 +49,9 @@ pub fn init(allocator: std.mem.Allocator, windowOptions: Options) !Self {
         .height = windowOptions.height,
         .title = try allocator.dupeSentinel(u8, windowOptions.title, 0),
         .width = windowOptions.width,
+        .is_fullscreen = windowOptions.fullscreen,
+        .is_maximized = windowOptions.maximize,
+        .is_minimized = windowOptions.minimize,
     };
 }
 
