@@ -17,7 +17,13 @@
 const std = @import("std");
 pub const Platform = @import("platform.zig");
 pub const Window = @import("window.zig");
-const wayland = @import("wayland/integration.zig");
+pub const VisualItem = @import("visualitem.zig");
+pub const Rectangle = @import("Rectangle.zig");
+pub const LayoutItem = @import("layoutitem.zig");
+pub const InputItem = @import("inputitem.zig");
+pub const Cairo = @import("zig-cairo");
+pub const Wayland = @import("zig-wayland");
+const wayland_integration = @import("wayland/integration.zig");
 const Self = @This();
 
 var instance: ?Self = null;
@@ -47,7 +53,7 @@ pub fn getInstance() !*Self {
 
 pub fn init(allocator: std.mem.Allocator) !void {
     instance = .{
-        .platformIntegration = try wayland.init(allocator),
+        .platformIntegration = try wayland_integration.init(allocator),
     };
 }
 pub fn deinit(allocator: std.mem.Allocator) void {

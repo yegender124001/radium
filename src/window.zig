@@ -30,6 +30,7 @@ pub const Options = struct {
     minimize: bool = false,
 };
 
+rootVisualItem: ?*rad.VisualItem = null,
 width: u32 = 1280,
 height: u32 = 720,
 title: [:0]const u8,

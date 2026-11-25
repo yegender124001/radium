@@ -61,9 +61,12 @@ fn surfaceListener(_: *wl.Surface, event: wl.Surface.Event, _: *Self) void {
 }
 
 fn draw(self: *Self, ctx: *cairo.Context) !void {
-    try ctx.setSourceRgb(1.0, 0.0, 0.0);
-    try ctx.paint();
-    _ = self;
+    if (self.window.rootVisualItem) |item| {
+        try item.draw(ctx);
+    } else {
+        try ctx.setSourceRgb(1.0, 0.0, 0.0);
+        try ctx.paint();
+    }
 }
 
 fn xdgToplevelListener(toplevel: *xdg.Toplevel, event: xdg.Toplevel.Event, self: *Self) void {
