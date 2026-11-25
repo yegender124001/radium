@@ -93,7 +93,7 @@ fn xdgToplevelListener(toplevel: *xdg.Toplevel, event: xdg.Toplevel.Event, self:
                 self.window.width = @intCast(e.width);
                 self.window.height = @intCast(e.height);
 
-                if (self.is_resizing == true) return; // Pahale resize karlo aram se fir dekhenge
+                if (self.window.is_resizing == true) return; // Pahale resize karlo aram se fir dekhenge
 
                 // Ab dekhte hai
                 if (self.window.platformBackingStore) |*store| {
@@ -197,7 +197,7 @@ fn xdgSurfaceListener(surface: *xdg.Surface, event: xdg.Surface.Event, self: *Se
             surface.ackConfigure(e.serial);
             self.configured = true;
 
-            if (self.is_resizing == true) {
+            if (self.window.is_resizing == true) {
                 self.wp_viewport.setDestination(@intCast(self.window.width), @intCast(self.window.height));
                 self.wl_surface.commit();
             } else {

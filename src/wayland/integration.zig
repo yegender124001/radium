@@ -24,6 +24,7 @@ const zxdg = wl_client.zxdg;
 const zwlr = wl_client.zwlr;
 const Self = @This();
 
+allocator: std.mem.Allocator,
 wl_display: *wl.Display,
 wl_registry: *wl.Registry,
 wl_compositor: ?*wl.Compositor = null,
@@ -32,6 +33,13 @@ wl_shm: ?*wl.Shm = null,
 xdg_wm_base: ?*xdg.WmBase = null,
 xdg_decoration: ?*zxdg.DecorationManagerV1 = null,
 wlr_layer_shell: ?*zwlr.LayerShellV1 = null,
+globals: std.ArrayList(Global) = .empty,
+
+pub const Global = struct {
+    name: u32,
+    interface: []const u8,
+    version: u32,
+};
 
 const VTable: Platform.Integration.VTable = .{
     .deinit = deinit,
@@ -72,6 +80,14 @@ fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, self: *Sel
             } else if (std.mem.orderZ(u8, e.interface, wp.Viewporter.interface.name) == .eq) {
                 self.wp_viewporter = registry.bind(e.name, wp.Viewporter, e.version) catch return;
             }
+
+            if (std.mem.orderZ(u8, e.interface, wl.Output.interface.name) != .eq) {
+                self.globals.append(self.allocator, .{
+                    .name = e.name,
+                    .interface = self.allocator.dupe(u8, std.mem.span(e.interface)[0..]) catch return,
+                    .version = e.version,
+                }) catch return;
+            }
         },
         .global_remove => {},
     }
@@ -80,6 +96,7 @@ fn registryListener(registry: *wl.Registry, event: wl.Registry.Event, self: *Sel
 pub fn init(allocator: std.mem.Allocator) !Platform.Integration {
     const self = try allocator.create(Self);
     self.* = .{
+        .allocator = allocator,
         .wl_display = try wl.Display.connect(null),
         .wl_registry = try self.wl_display.getRegistry(),
     };
@@ -133,7 +150,10 @@ pub fn deinit(userdata: ?*anyopaque, allocator: std.mem.Allocator) void {
         if (self.wlr_layer_shell) |shell| {
             shell.destroy();
         }
-
+        for (self.globals.items) |*item| {
+            allocator.free(item.interface);
+        }
+        self.globals.deinit(allocator);
         self.wl_registry.destroy();
         self.wl_display.disconnect();
 

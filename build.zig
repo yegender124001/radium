@@ -20,6 +20,7 @@ const Scanner = @import("wayland").Scanner;
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
+    const llvm = b.option(bool, "llvm", "Use llvm for compiling");
 
     const scanner = Scanner.create(b, .{});
     const wayland = b.createModule(.{ .root_source_file = scanner.result });
@@ -66,7 +67,8 @@ pub fn build(b: *std.Build) void {
 
     const gallery = b.addExecutable(.{
         .name = "radium-gallery",
-        .use_llvm = true,
+        .use_lld = llvm,
+        .use_llvm = llvm,
         .root_module = b.addModule("gallery/", .{
             .root_source_file = b.path("gallery/main.zig"),
             .optimize = optimize,
