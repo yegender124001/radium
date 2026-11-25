@@ -16,6 +16,7 @@
 
 const Self = @This();
 const rad = @import("../radium.zig");
+const cairo = @import("zig-cairo");
 const wayland_globals = @import("integration.zig");
 const std = @import("std");
 const wl_client = @import("zig-wayland").client;
@@ -63,6 +64,21 @@ fn xdgSurfaceListener(surface: *xdg.Surface, event: xdg.Surface.Event, self: *Se
             surface.ackConfigure(e.serial);
 
             self.configured = true;
+            self.window.platformBackingStore.?.swapBuffers() catch return;
+            const srfc = self.window.platformBackingStore.?.getActiveCairoSurface() catch return;
+            var ctx = srfc.createContext() catch return;
+            ctx.setSourceRgba(0.0, 0.0, 0.0, 0.7) catch return;
+            ctx.paint() catch return;
+
+            ctx.setSourceRgb(0.0, 0.0, 0.0) catch return;
+            ctx.rectangle(300.0, 0.0, @floatFromInt(@as(i32, @intCast(self.window.width)) - 300), @floatFromInt(self.window.height)) catch return;
+            ctx.fill() catch return;
+
+            ctx.setSourceRgb(0.3, 0.5, 0.9) catch return;
+            ctx.setLineWidth(2.0) catch return;
+            ctx.rectangle(0.0, 200.0, @floatFromInt(self.window.width), @floatFromInt(@as(i32, @intCast(self.window.height)) - 400)) catch return;
+            ctx.fill() catch return;
+            ctx.deinit();
         },
     }
 }
@@ -71,9 +87,21 @@ fn xdgToplevelListener(toplevel: *xdg.Toplevel, event: xdg.Toplevel.Event, self:
     _ = toplevel;
     switch (event) {
         .configure => |e| {
-            if (e.width != 0 or e.height != 0) {
+            if ((e.width != 0 or e.height != 0) and
+                (e.width != @as(i32, @intCast(self.window.width)) or
+                    e.height != @as(i32, @intCast(self.window.height))))
+            {
                 self.window.width = @intCast(e.width);
                 self.window.height = @intCast(e.height);
+                if (self.window.platformBackingStore) |*store| {
+                    store.resize() catch |err| switch (err) {
+                        else => {
+                            std.log.err("There is this error: {}", .{err});
+                        },
+                    };
+                } else {
+                    std.log.err("No backing store", .{});
+                }
             }
         },
         .close => {

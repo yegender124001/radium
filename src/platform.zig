@@ -89,6 +89,6 @@ pub const RasterBackingStore = struct {
     }
 
     pub fn resize(self: *Self) !void {
-        try self.resize();
+        try self.vtable.resize(self.userdata);
     }
 };

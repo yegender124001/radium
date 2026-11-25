@@ -19,6 +19,7 @@ const std = @import("std");
 const cairo = @import("zig-cairo");
 const rad = @import("../radium.zig");
 const wayland_integration = @import("integration.zig");
+const WaylandWindow = @import("window.zig");
 const posix = std.posix;
 const linux = std.os.linux;
 const wl_client = @import("zig-wayland").client;
@@ -48,13 +49,13 @@ sharedFd: posix.fd_t = 0,
 buffers: std.ArrayList(Buffer) = .empty,
 maxSize: u32 = 0,
 addr: []align(4096) u8 = &.{},
+oldStride: usize = 0,
+oldHeight: usize = 0,
 
 fn resize(userdata: ?*anyopaque) !void {
     if (userdata) |data| {
         const self: *Self = @ptrCast(@alignCast(data));
-
         self.destroyBuffers(self.allocator);
-
         const stride: usize = @intCast(self.window.width * 4);
         const height: usize = @intCast(self.window.height);
         const bufferSize = std.mem.alignForward(usize, stride * height, @alignOf(u32));
@@ -68,7 +69,6 @@ fn resize(userdata: ?*anyopaque) !void {
                 },
             }
             if (self.addr.len > 0) posix.munmap(self.addr);
-
             self.addr = try posix.mmap(
                 null,
                 @intCast(newSize),
@@ -77,20 +77,31 @@ fn resize(userdata: ?*anyopaque) !void {
                 self.sharedFd,
                 0,
             );
-
             self.shmPool.resize(@intCast(newSize));
         } else {
             // We don't make the size of less
         }
-
         try self.createBuffers(self.allocator);
     }
 }
 
 fn swapBuffers(userdata: ?*anyopaque) !void {
+    // This is bugged. Active buffer is displayed on the screen. We want to actually have a buffer that is pending to draw lol.
     if (userdata) |data| {
         const self: *Self = @ptrCast(@alignCast(data));
-        _ = self;
+        const platformWindow: *WaylandWindow = @ptrCast(@alignCast((&self.window.platformWindow.?).userdata.?));
+        for (self.buffers.items) |*buffer| {
+            if (buffer.released == true) {
+                if (platformWindow.configured == true) {
+                    platformWindow.wl_surface.attach(buffer.buffer, 0, 0);
+                    platformWindow.wl_surface.damage(0, 0, @intCast(self.window.width), @intCast(self.window.height));
+                    platformWindow.wl_surface.commit();
+                    buffer.released = false;
+                    self.activeBuffer = buffer;
+                    break;
+                }
+            }
+        }
     }
 }
 
@@ -140,7 +151,7 @@ fn createBuffers(self: *Self, allocator: std.mem.Allocator) !void {
                 @intCast(height),
                 @intCast(stride),
             ),
-            .released = false,
+            .released = true,
         });
 
         buffer.setListener(*Buffer, bufferListener, &self.buffers.items[i]);

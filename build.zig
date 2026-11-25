@@ -66,6 +66,7 @@ pub fn build(b: *std.Build) void {
 
     const gallery = b.addExecutable(.{
         .name = "radium-gallery",
+        .use_llvm = true,
         .root_module = b.addModule("gallery/", .{
             .root_source_file = b.path("gallery/main.zig"),
             .optimize = optimize,

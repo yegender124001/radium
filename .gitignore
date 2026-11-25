@@ -1,6 +1,13 @@
+# KDE
+.kdev4/
+.kdev4
 .directory
+
+# Zig
 .zig-cache/
-.zed/
 zig-pkg/
 zig-out/
+
+# Zed stuff
+.zed/
 * copy.zig
